@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, Bell, Wallet, Settings2 } from 'lucide-react';
+import { Search, Bell, Wallet, Settings2, Radar } from 'lucide-react';
 import { haptic } from '@/lib/telegram';
 
 const ACTIONS = [
+  { href: '/tarayici', label: 'Tarayıcı', icon: Radar },
   { href: '/piyasalar', label: 'Piyasalar', icon: Search },
   { href: '/portfoy', label: 'Portföy', icon: Wallet },
   { href: '/alarm', label: 'Alarm Kur', icon: Bell },
@@ -14,7 +15,7 @@ const ACTIONS = [
 
 export function QuickActions() {
   return (
-    <div className="px-4 pt-4 grid grid-cols-4 gap-2">
+    <div className="px-4 pt-4 grid grid-cols-5 gap-2">
       {ACTIONS.map((action, i) => {
         const Icon = action.icon;
         return (

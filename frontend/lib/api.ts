@@ -1,4 +1,16 @@
-import type { Alert, Candle, CandleInterval, Position, ProviderHealth, Quote, SymbolDef, WatchlistItem } from './types';
+import type {
+  Alert,
+  Candle,
+  CandleInterval,
+  Position,
+  ProviderHealth,
+  Quote,
+  ScannerFilters,
+  ScannerPreset,
+  ScannerRow,
+  SymbolDef,
+  WatchlistItem,
+} from './types';
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_HTTP_URL ?? 'http://localhost:4000';
 
@@ -45,5 +57,23 @@ export const api = {
       json<{ items: WatchlistItem[] }>('/api/watchlist', { method: 'POST', body: JSON.stringify({ symbol }) }),
     remove: (symbol: string) =>
       json<{ items: WatchlistItem[] }>(`/api/watchlist/${encodeURIComponent(symbol)}`, { method: 'DELETE' }),
+  },
+  scanner: {
+    query: (filters: ScannerFilters) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== '') params.set(key, String(value));
+      }
+      return json<{ rows: ScannerRow[]; total: number }>(`/api/scanner?${params.toString()}`);
+    },
+  },
+  scannerPresets: {
+    list: () => json<{ presets: ScannerPreset[] }>('/api/scanner-presets'),
+    add: (name: string, filters: Record<string, string | number>) =>
+      json<{ presets: ScannerPreset[] }>('/api/scanner-presets', {
+        method: 'POST',
+        body: JSON.stringify({ name, filters }),
+      }),
+    remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
   },
 };

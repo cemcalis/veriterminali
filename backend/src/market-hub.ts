@@ -8,7 +8,7 @@ import { TwelveDataProvider } from '../../src/providers/twelvedata.provider.js';
 import { SYMBOL_CATALOG, type SymbolDef } from '../../src/symbols.js';
 import { DiscoveredSymbolStore } from '../../src/discovered-symbols.js';
 import { dynamicSymbolLookup } from '../../src/symbol-lookup.js';
-import type { Quote, MarketCategory, DataStatus } from '../../src/providers/market-provider.interface.js';
+import type { Quote, MarketCategory, DataStatus, CandleInterval } from '../../src/providers/market-provider.interface.js';
 import { Cache } from './cache.js';
 import { JsonStore } from './store/json-store.js';
 import { fileURLToPath } from 'node:url';
@@ -244,6 +244,18 @@ export class MarketHub {
     }
 
     return null;
+  }
+
+  /** Picks the right live provider for a symbol's category and fetches
+   * its recent candle history. Shared by the /candles REST route and the
+   * scanner's on-demand indicator computation. */
+  async getCandlesFor(def: SymbolDef, interval: CandleInterval, limit = 200) {
+    const providerId =
+      def.category === 'crypto' ? 'binance' : def.category === 'crypto_futures' ? 'binance-futures' : 'tradingview-twc';
+    const provider = this.registry.get(providerId);
+    if (!provider) return { candles: [], providerId };
+    const candles = await provider.getCandles(def.symbol, interval, limit);
+    return { candles, providerId };
   }
 
   async healthSnapshot() {
