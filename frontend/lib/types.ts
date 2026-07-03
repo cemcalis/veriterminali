@@ -1,4 +1,12 @@
-export type MarketCategory = 'crypto' | 'forex' | 'commodity' | 'bist' | 'us_stock' | 'etf' | 'index';
+export type MarketCategory =
+  | 'crypto'
+  | 'crypto_futures'
+  | 'forex'
+  | 'commodity'
+  | 'bist'
+  | 'us_stock'
+  | 'etf'
+  | 'index';
 
 export type DataStatus = 'live' | 'near-live' | 'delayed' | 'fallback' | 'unavailable';
 
@@ -68,4 +76,9 @@ export interface Alert {
   targetPrice: number;
   createdAt: number;
   triggeredAt: number | null;
+}
+
+export interface WatchlistItem {
+  symbol: string;
+  addedAt: number;
 }

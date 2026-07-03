@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronRight, Star } from 'lucide-react';
 import { GreetingHeader } from '@/components/greeting-header';
 import { MarketStatus } from '@/components/market-status';
+import { ExchangeSessionsStrip } from '@/components/exchange-sessions-strip';
 import { QuickActions } from '@/components/quick-actions';
 import { MarketOverview } from '@/components/market-overview';
 import { TopMovers } from '@/components/top-movers';
@@ -47,6 +48,7 @@ export default function AnasayfaPage() {
     <div className="pb-4">
       <GreetingHeader />
       <MarketStatus />
+      <ExchangeSessionsStrip />
       <QuickActions />
       <MarketOverview />
       <TopMovers title="Yükselenler" direction="up" emptyHint="Şu an yükselen enstrüman verisi bekleniyor" />
@@ -56,6 +58,7 @@ export default function AnasayfaPage() {
       <RecentlyViewed />
       <ProviderHealthStrip />
       <Section title="Kripto Paralar" category="crypto" />
+      <Section title="Kripto Vadeli" category="crypto_futures" />
       <Section title="Endeksler" category="index" />
       <Section title="Forex" category="forex" />
       <Section title="Emtia" category="commodity" />

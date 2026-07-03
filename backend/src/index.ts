@@ -8,6 +8,7 @@ import { Cache } from './cache.js';
 import { marketRouter } from './routes/market.js';
 import { portfolioRouter } from './routes/portfolio.js';
 import { alertsRouter } from './routes/alerts.js';
+import { watchlistRouter } from './routes/watchlist.js';
 import { sendTelegramMessage } from './telegram.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -26,6 +27,7 @@ async function main() {
 
   app.use('/api/market', marketRouter(hub));
   app.use('/api/portfolio', portfolioRouter(hub));
+  app.use('/api/watchlist', watchlistRouter());
   const { router: alertsRoute, checkAlerts } = alertsRouter(hub);
   app.use('/api/alerts', alertsRoute);
 
