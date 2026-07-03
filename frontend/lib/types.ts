@@ -125,6 +125,21 @@ export interface ScannerPreset {
   createdAt: number;
 }
 
+export interface MacroEvent {
+  date: string;
+  country: 'TR' | 'US';
+  title: string;
+  category: 'faiz_karari' | 'enflasyon_raporu' | 'finansal_istikrar_raporu' | 'fomc';
+}
+
+export interface EarningsEvent {
+  startDate: string;
+  endDate: string;
+  subject: string;
+  period: string;
+  year: string;
+}
+
 export type DisclosureCategory =
   | 'temettu'
   | 'sermaye_artirimi'

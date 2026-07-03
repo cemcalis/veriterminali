@@ -2,7 +2,9 @@ import type {
   Alert,
   Candle,
   CandleInterval,
+  EarningsEvent,
   EquitySnapshot,
+  MacroEvent,
   InstitutionalResult,
   NewsItem,
   Position,
@@ -86,6 +88,16 @@ export const api = {
         body: JSON.stringify({ name, filters }),
       }),
     remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
+  },
+  calendar: {
+    economic: (from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      return json<{ events: MacroEvent[] }>(`/api/calendar/economic?${params.toString()}`);
+    },
+    earnings: (symbol: string) =>
+      json<{ events: EarningsEvent[] }>(`/api/calendar/earnings/${encodeURIComponent(symbol)}`),
   },
   news: {
     forSymbol: (symbol: string) => json<{ items: NewsItem[]; cached: boolean }>(`/api/news/${encodeURIComponent(symbol)}`),
