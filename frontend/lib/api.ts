@@ -2,6 +2,7 @@ import type {
   Alert,
   Candle,
   CandleInterval,
+  InstitutionalResult,
   Position,
   ProviderHealth,
   Quote,
@@ -75,5 +76,11 @@ export const api = {
         body: JSON.stringify({ name, filters }),
       }),
     remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
+  },
+  institutional: {
+    depth: (symbol: string) => json<InstitutionalResult<unknown>>(`/api/institutional/depth/${encodeURIComponent(symbol)}`),
+    akd: (symbol: string) => json<InstitutionalResult<unknown>>(`/api/institutional/akd/${encodeURIComponent(symbol)}`),
+    teorik: (symbol: string) => json<InstitutionalResult<unknown>>(`/api/institutional/teorik/${encodeURIComponent(symbol)}`),
+    takas: (symbol: string) => json<InstitutionalResult<unknown>>(`/api/institutional/takas/${encodeURIComponent(symbol)}`),
   },
 };
