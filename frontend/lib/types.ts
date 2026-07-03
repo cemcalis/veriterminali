@@ -108,3 +108,7 @@ export interface ScannerPreset {
   filters: Record<string, string | number>;
   createdAt: number;
 }
+
+export type InstitutionalResult<T> =
+  | { available: true; data: T; asOf: number; source: string }
+  | { available: false; reason: 'licensed_data_required'; message: string; vendorOptions: string[] };

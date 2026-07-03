@@ -11,6 +11,7 @@ import { alertsRouter } from './routes/alerts.js';
 import { watchlistRouter } from './routes/watchlist.js';
 import { scannerRouter } from './routes/scanner.js';
 import { scannerPresetsRouter } from './routes/scanner-presets.js';
+import { institutionalRouter } from './routes/institutional.js';
 import { sendTelegramMessage } from './telegram.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -32,6 +33,7 @@ async function main() {
   app.use('/api/watchlist', watchlistRouter());
   app.use('/api/scanner', scannerRouter(hub));
   app.use('/api/scanner-presets', scannerPresetsRouter());
+  app.use('/api/institutional', institutionalRouter());
   const { router: alertsRoute, checkAlerts } = alertsRouter(hub);
   app.use('/api/alerts', alertsRoute);
 
