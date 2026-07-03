@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { api } from '@/lib/api';
+import { InfoTip } from './info-tip';
 import type { InstitutionalResult } from '@/lib/types';
 
 type Kind = 'depth' | 'akd' | 'teorik' | 'takas';
@@ -12,6 +13,13 @@ const LABELS: Record<Kind, string> = {
   akd: 'Aracı Kurum Dağılımı',
   teorik: 'Teorik Fiyat',
   takas: 'Takas Verileri',
+};
+
+const GLOSSARY_SLUGS: Record<Kind, string> = {
+  depth: 'derinlik',
+  akd: 'akd',
+  teorik: 'teorik-fiyat',
+  takas: 'takas',
 };
 
 /** Honest empty-state for the four BIST datasets that require a licensed
@@ -29,7 +37,10 @@ function VendorGate({ kind, result }: { kind: Kind; result: InstitutionalResult<
     <div className="panel-elevated p-3 flex gap-2.5">
       <Lock size={15} className="shrink-0 text-slate-500 mt-0.5" />
       <div>
-        <div className="text-xs font-medium text-slate-300">{LABELS[kind]}</div>
+        <div className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+          {LABELS[kind]}
+          <InfoTip slug={GLOSSARY_SLUGS[kind]} />
+        </div>
         <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{result.message}</p>
       </div>
     </div>
