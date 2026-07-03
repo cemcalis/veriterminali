@@ -1,4 +1,5 @@
 import type {
+  AiAnswer,
   Alert,
   Candle,
   CandleInterval,
@@ -89,6 +90,9 @@ export const api = {
         body: JSON.stringify({ name, filters }),
       }),
     remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
+  },
+  ai: {
+    ask: (question: string) => json<AiAnswer>('/api/ai/ask', { method: 'POST', body: JSON.stringify({ question }) }),
   },
   corporateActions: {
     forSymbol: (symbol: string) =>

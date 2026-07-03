@@ -159,6 +159,14 @@ export interface NewsItem {
 
 export type CorporateActionItem = NewsItem;
 
+export interface AiAnswer {
+  answer: string;
+  groundedData: unknown;
+  sources: string[];
+  disclaimer: string;
+  llmPhrased: boolean;
+}
+
 export type InstitutionalResult<T> =
   | { available: true; data: T; asOf: number; source: string }
   | { available: false; reason: 'licensed_data_required'; message: string; vendorOptions: string[] };
