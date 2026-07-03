@@ -13,7 +13,11 @@ const ROOT = join(__dirname, '..');
 
 const EXCLUDE_LEVERAGED = /(UP|DOWN|BULL|BEAR)USDT$/;
 const EXCLUDE_BASES = new Set(['USDC', 'FDUSD', 'TUSD', 'BUSD', 'USDP', 'DAI', 'EUR', 'EURI', 'GUSD', 'USD1', 'RLUSD', 'AEUR']);
-const MAX_CRYPTO = 400;
+// No artificial cap: every real, currently-traded USDT pair Binance
+// reports (after excluding leveraged tokens and stablecoin-vs-stablecoin
+// noise) is included.
+const MAX_CRYPTO = 2000;
+const MAX_FUTURES = 2000;
 
 async function fetchCryptoSymbols() {
   const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
@@ -36,6 +40,31 @@ async function fetchCryptoSymbols() {
       category: 'crypto',
       displayName: base,
       displayNameTr: base,
+    };
+  });
+}
+
+async function fetchFuturesSymbols() {
+  const res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+  if (!res.ok) {
+    console.warn(`Binance futures 24hr ticker fetch failed: HTTP ${res.status} -- skipping futures`);
+    return [];
+  }
+  const rows = await res.json();
+  const usdt = rows.filter((r) => {
+    if (!/^[A-Z0-9]+USDT$/.test(r.symbol)) return false;
+    if (Number.isNaN(parseFloat(r.quoteVolume))) return false;
+    return true;
+  });
+  usdt.sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
+  return usdt.slice(0, MAX_FUTURES).map((r) => {
+    const base = r.symbol.slice(0, -4);
+    return {
+      symbol: `BINANCEFUTURES:${r.symbol}`,
+      binanceSymbol: r.symbol,
+      category: 'crypto_futures',
+      displayName: `${base} Vadeli`,
+      displayNameTr: `${base} Vadeli`,
     };
   });
 }
@@ -207,6 +236,49 @@ const ETFS = [
   ['TQQQ', 'ProShares UltraPro QQQ'], ['SQQQ', 'ProShares UltraPro Short QQQ'],
   ['SPXL', 'Direxion Daily S&P 500 Bull 3X Shares'], ['SPXS', 'Direxion Daily S&P 500 Bear 3X Shares'],
   ['VXX', 'iPath Series B S&P 500 VIX Short-Term Futures ETN'],
+  ['VUG', 'Vanguard Growth ETF'], ['VTV', 'Vanguard Value ETF'], ['IJH', 'iShares Core S&P Mid-Cap ETF'],
+  ['IJR', 'iShares Core S&P Small-Cap ETF'], ['MDY', 'SPDR S&P MidCap 400 ETF'], ['VB', 'Vanguard Small-Cap ETF'],
+  ['VO', 'Vanguard Mid-Cap ETF'], ['SCHX', 'Schwab U.S. Large-Cap ETF'], ['SCHB', 'Schwab U.S. Broad Market ETF'],
+  ['ITOT', 'iShares Core S&P Total U.S. Stock Market ETF'], ['SPLG', 'SPDR Portfolio S&P 500 ETF'],
+  ['RSP', 'Invesco S&P 500 Equal Weight ETF'], ['DVY', 'iShares Select Dividend ETF'],
+  ['SDY', 'SPDR S&P Dividend ETF'], ['NOBL', 'ProShares S&P 500 Dividend Aristocrats ETF'],
+  ['JEPI', 'JPMorgan Equity Premium Income ETF'], ['JEPQ', 'JPMorgan Nasdaq Equity Premium Income ETF'],
+  ['QYLD', 'Global X Nasdaq 100 Covered Call ETF'], ['XYLD', 'Global X S&P 500 Covered Call ETF'],
+  ['PFF', 'iShares Preferred and Income Securities ETF'], ['MUB', 'iShares National Muni Bond ETF'],
+  ['TIP', 'iShares TIPS Bond ETF'], ['VCIT', 'Vanguard Intermediate-Term Corporate Bond ETF'],
+  ['VCSH', 'Vanguard Short-Term Corporate Bond ETF'], ['BIL', 'SPDR Bloomberg 1-3 Month T-Bill ETF'],
+  ['SHV', 'iShares Short Treasury Bond ETF'], ['GOVT', 'iShares U.S. Treasury Bond ETF'],
+  ['EMB', 'iShares JPMorgan USD Emerging Markets Bond ETF'], ['BNDX', 'Vanguard Total International Bond ETF'],
+  ['PPA', 'Invesco Aerospace & Defense ETF'], ['XAR', 'SPDR S&P Aerospace & Defense ETF'],
+  ['KBE', 'SPDR S&P Bank ETF'], ['IYR', 'iShares U.S. Real Estate ETF'], ['REM', 'iShares Mortgage Real Estate ETF'],
+  ['PAVE', 'Global X U.S. Infrastructure Development ETF'], ['URA', 'Global X Uranium ETF'],
+  ['LIT', 'Global X Lithium & Battery Tech ETF'], ['REMX', 'VanEck Rare Earth/Strategic Metals ETF'],
+  ['COPX', 'Global X Copper Miners ETF'], ['SLX', 'VanEck Steel ETF'], ['CORN', 'Teucrium Corn Fund'],
+  ['WEAT', 'Teucrium Wheat Fund'], ['SOYB', 'Teucrium Soybean Fund'], ['CANE', 'Teucrium Sugar Fund'],
+  ['DBA', 'Invesco DB Agriculture Fund'], ['DBC', 'Invesco DB Commodity Index Tracking Fund'],
+  ['PDBC', 'Invesco Optimum Yield Diversified Commodity ETF'], ['USL', 'United States 12 Month Oil Fund'],
+  ['UGA', 'United States Gasoline Fund'], ['UUP', 'Invesco DB US Dollar Index Bullish Fund'],
+  ['UDN', 'Invesco DB US Dollar Index Bearish Fund'], ['FXE', 'Invesco CurrencyShares Euro Trust'],
+  ['FXY', 'Invesco CurrencyShares Japanese Yen Trust'], ['FXB', 'Invesco CurrencyShares British Pound Trust'],
+  ['EWW', 'iShares MSCI Mexico ETF'], ['EWY', 'iShares MSCI South Korea ETF'], ['EWT', 'iShares MSCI Taiwan ETF'],
+  ['EWH', 'iShares MSCI Hong Kong ETF'], ['EWS', 'iShares MSCI Singapore ETF'], ['EPI', 'WisdomTree India Earnings ETF'],
+  ['EIDO', 'iShares MSCI Indonesia ETF'], ['THD', 'iShares MSCI Thailand ETF'], ['EWM', 'iShares MSCI Malaysia ETF'],
+  ['EZA', 'iShares MSCI South Africa ETF'], ['TUR', 'iShares MSCI Turkey ETF'], ['RSX', 'VanEck Russia ETF'],
+  ['EWP', 'iShares MSCI Spain ETF'], ['EWI', 'iShares MSCI Italy ETF'], ['EWQ', 'iShares MSCI France ETF'],
+  ['EWL', 'iShares MSCI Switzerland ETF'], ['EWN', 'iShares MSCI Netherlands ETF'], ['EWD', 'iShares MSCI Sweden ETF'],
+  ['EWO', 'iShares MSCI Austria ETF'], ['NORW', 'Global X MSCI Norway ETF'], ['EDEN', 'iShares MSCI Denmark ETF'],
+  ['ACWI', 'iShares MSCI ACWI ETF'], ['VT', 'Vanguard Total World Stock ETF'], ['SCHF', 'Schwab International Equity ETF'],
+  ['SPYG', 'SPDR Portfolio S&P 500 Growth ETF'], ['SPYV', 'SPDR Portfolio S&P 500 Value ETF'],
+  ['MGK', 'Vanguard Mega Cap Growth ETF'], ['MTUM', 'iShares MSCI USA Momentum Factor ETF'],
+  ['QUAL', 'iShares MSCI USA Quality Factor ETF'], ['USMV', 'iShares MSCI USA Min Vol Factor ETF'],
+  ['SIZE', 'iShares MSCI USA Size Factor ETF'], ['VLUE', 'iShares MSCI USA Value Factor ETF'],
+  ['HACK', 'ETFMG Prime Cyber Security ETF'], ['BOTZ', 'Global X Robotics & Artificial Intelligence ETF'],
+  ['ARKG', 'ARK Genomic Revolution ETF'], ['ARKQ', 'ARK Autonomous Technology & Robotics ETF'],
+  ['ARKW', 'ARK Next Generation Internet ETF'], ['FINX', 'Global X FinTech ETF'], ['SKYY', 'First Trust Cloud Computing ETF'],
+  ['IGV', 'iShares Expanded Tech-Software Sector ETF'], ['FDN', 'First Trust Dow Jones Internet Index Fund'],
+  ['XHB', 'SPDR S&P Homebuilders ETF'], ['ITB', 'iShares U.S. Home Construction ETF'],
+  ['XRT', 'SPDR S&P Retail ETF'], ['PBW', 'Invesco WilderHill Clean Energy ETF'],
+  ['GRID', 'First Trust NASDAQ Clean Edge Smart Grid ETF'], ['HYD', 'VanEck High Yield Muni ETF'],
 ].map(([sym, name]) => ({
   symbol: sym,
   yahooSymbol: sym,
@@ -282,7 +354,8 @@ const seenBist = new Set();
 const BIST = [...BIST_INDICES, ...BIST_STOCKS].filter((s) => (seenBist.has(s.symbol) ? false : (seenBist.add(s.symbol), true)));
 
 // --- US stocks: S&P 500 constituents (real, currently-listed large caps) ---
-const US_STOCKS_RAW = `AAPL Apple|MSFT Microsoft|NVDA NVIDIA|AMZN Amazon|GOOGL Alphabet (A)|GOOG Alphabet (C)|META Meta Platforms|BRK.B Berkshire Hathaway|AVGO Broadcom|TSLA Tesla|LLY Eli Lilly|JPM JPMorgan Chase|V Visa|UNH UnitedHealth|XOM ExxonMobil|MA Mastercard|COST Costco|HD Home Depot|PG Procter & Gamble|JNJ Johnson & Johnson|NFLX Netflix|BAC Bank of America|CRM Salesforce|ABBV AbbVie|MRK Merck|KO Coca-Cola|CVX Chevron|AMD Advanced Micro Devices|PEP PepsiCo|ORCL Oracle|ADBE Adobe|TMO Thermo Fisher Scientific|WMT Walmart|LIN Linde|MCD McDonald's|CSCO Cisco|ACN Accenture|ABT Abbott Laboratories|DHR Danaher|WFC Wells Fargo|TXN Texas Instruments|GE General Electric|PM Philip Morris International|IBM IBM|CAT Caterpillar|VZ Verizon|INTU Intuit|NOW ServiceNow|AMAT Applied Materials|NEE NextEra Energy|CMCSA Comcast|ISRG Intuitive Surgical|AXP American Express|PFE Pfizer|UNP Union Pacific|DIS Walt Disney|QCOM Qualcomm|RTX RTX Corporation|SPGI S&P Global|LOW Lowe's|HON Honeywell|AMGN Amgen|BKNG Booking Holdings|COP ConocoPhillips|UPS United Parcel Service|T AT&T|BA Boeing|ELV Elevance Health|SYK Stryker|MS Morgan Stanley|BLK BlackRock|GS Goldman Sachs|MDT Medtronic|LMT Lockheed Martin|SBUX Starbucks|ADI Analog Devices|PLD Prologis|CB Chubb|TJX TJX Companies|GILD Gilead Sciences|MMC Marsh McLennan|VRTX Vertex Pharmaceuticals|C Citigroup|SCHW Charles Schwab|ETN Eaton|ADP Automatic Data Processing|CI Cigna|MO Altria|BSX Boston Scientific|REGN Regeneron Pharmaceuticals|SO Southern Company|ZTS Zoetis|PGR Progressive|FI Fiserv|DUK Duke Energy|EQIX Equinix|CME CME Group|MU Micron Technology|APH Amphenol|SHW Sherwin-Williams|AON Aon|ITW Illinois Tool Works|CL Colgate-Palmolive|TGT Target|CSX CSX Corporation|WM Waste Management|PNC PNC Financial|MCK McKesson|USB US Bancorp|NOC Northrop Grumman|CDNS Cadence Design Systems|EOG EOG Resources|FDX FedEx|MPC Marathon Petroleum|EMR Emerson Electric|SNPS Synopsys|APD Air Products|ICE Intercontinental Exchange|CMG Chipotle Mexican Grill|NSC Norfolk Southern|MAR Marriott International|ORLY O'Reilly Automotive|GD General Dynamics|ROP Roper Technologies|PXD Pioneer Natural Resources|PSA Public Storage|FCX Freeport-McMoRan|F Ford Motor|GM General Motors|OXY Occidental Petroleum|AJG Arthur J. Gallagher|TFC Truist Financial|AZO AutoZone|MSI Motorola Solutions|SRE Sempra Energy|TT Trane Technologies|CARR Carrier Global|ANET Arista Networks|HUM Humana|NXPI NXP Semiconductors|AEP American Electric Power|MET MetLife|PSX Phillips 66|ADM Archer-Daniels-Midland|WELL Welltower|DXCM Dexcom|PCAR Paccar|KLAC KLA Corporation|CTAS Cintas|D Dominion Energy|MCHP Microchip Technology|EW Edwards Lifesciences|COF Capital One|AIG American International Group|ROST Ross Stores|A Agilent Technologies|LHX L3Harris Technologies|MNST Monster Beverage|IQV IQVIA Holdings|CPRT Copart|SPG Simon Property Group|HES Hess Corporation|EXC Exelon|KMB Kimberly-Clark|PAYX Paychex|AFL Aflac|DOW Dow Inc|GIS General Mills|IDXX IDEXX Laboratories|BK BNY Mellon|OTIS Otis Worldwide|MSCI MSCI Inc|SYY Sysco|CTVA Corteva|CHTR Charter Communications|BIIB Biogen|VLO Valero Energy|ODFL Old Dominion Freight Line|WMB Williams Companies|HAL Halliburton|KMI Kinder Morgan|YUM Yum! Brands|PRU Prudential Financial|ALL Allstate|TEL TE Connectivity|CMI Cummins|DD DuPont|EA Electronic Arts|DVN Devon Energy|RSG Republic Services|GWW W.W. Grainger|NUE Nucor|ON ON Semiconductor|EL Estee Lauder|VRSK Verisk Analytics|ACGL Arch Capital Group|CTSH Cognizant Technology|ED Consolidated Edison|FTNT Fortinet|FAST Fastenal|HSY Hershey|XEL Xcel Energy|PEG Public Service Enterprise|GLW Corning|ROK Rockwell Automation|AMP Ameriprise Financial|PPG PPG Industries|APTV Aptiv|LEN Lennar|DLR Digital Realty Trust|WEC WEC Energy|KDP Keurig Dr Pepper|ANSS Ansys|KR Kroger|ES Eversource Energy|BKR Baker Hughes|ZBH Zimmer Biomet|VMC Vulcan Materials|DFS Discover Financial|MTD Mettler-Toledo|MLM Martin Marietta Materials|EIX Edison International|CDW CDW Corporation|FANG Diamondback Energy|TSCO Tractor Supply|WBD Warner Bros Discovery|AWK American Water Works|CBRE CBRE Group|HIG Hartford Financial|EFX Equifax|IT Gartner|RMD ResMed|WY Weyerhaeuser|GPN Global Payments|CAH Cardinal Health|STZ Constellation Brands|ULTA Ulta Beauty|GEHC GE HealthCare|ILMN Illumina|NDAQ Nasdaq Inc|DAL Delta Air Lines|CNC Centene|ETR Entergy|LYB LyondellBasell|VICI VICI Properties|LVS Las Vegas Sands|ROL Rollins|HPQ HP Inc|ARE Alexandria Real Estate|IRM Iron Mountain|K Kellanova|PCG PG&E|EBAY eBay|FE FirstEnergy|FITB Fifth Third Bancorp|WTW Willis Towers Watson|DHI D.R. Horton|MPWR Monolithic Power Systems|HPE Hewlett Packard Enterprise|NVR NVR Inc|RJF Raymond James|TDY Teledyne Technologies|VLTO Veralto|EXR Extra Space Storage|CHD Church & Dwight|LUV Southwest Airlines|CINF Cincinnati Financial|SBAC SBA Communications|MKC McCormick & Company|FSLR First Solar|STE Steris|BR Broadridge Financial|STT State Street|SYF Synchrony Financial|GPC Genuine Parts|EQR Equity Residential|TROW T. Rowe Price|CTRA Coterra Energy|AVB AvalonBay Communities|OKE ONEOK|HBAN Huntington Bancshares|DOV Dover Corporation|NTRS Northern Trust|EXPE Expedia Group|WAT Waters Corporation|WST West Pharmaceutical Services|DTE DTE Energy|PPL PPL Corporation|COO Cooper Companies|PHM PulteGroup|TYL Tyler Technologies|VTR Ventas|CMS CMS Energy|LDOS Leidos Holdings|AEE Ameren|NTAP NetApp|FDS FactSet Research|BALL Ball Corporation|PFG Principal Financial|MOH Molina Healthcare|CFG Citizens Financial|MRO Marathon Oil|TXT Textron|ATO Atmos Energy|LH Labcorp|J Jacobs Solutions|DGX Quest Diagnostics|CBOE Cboe Global Markets|IEX IDEX Corporation|CLX Clorox|SWKS Skyworks Solutions|POOL Pool Corporation|NDSN Nordson|ESS Essex Property Trust|MAA Mid-America Apartment|BAX Baxter International|MAS Masco|JBHT J.B. Hunt Transport|AKAM Akamai Technologies|CE Celanese|IFF International Flavors|ALGN Align Technology|INVH Invitation Homes|SJM J.M. Smucker|TER Teradyne|HRL Hormel Foods|EVRG Evergy|LNT Alliant Energy|PKI Revvity|NI NiSource|WRB W.R. Berkley|EPAM EPAM Systems|APA APA Corporation|HOLX Hologic|CAG Conagra Brands|BBY Best Buy|SNA Snap-on|ZBRA Zebra Technologies|TRMB Trimble|SWK Stanley Black & Decker|JKHY Jack Henry & Associates|UDR UDR Inc|KEY KeyCorp|CPT Camden Property Trust|CF CF Industries|PNR Pentair|EMN Eastman Chemical|BXP BXP Inc|NRG NRG Energy|GEN Gen Digital|PAYC Paycom Software|MGM MGM Resorts|CRL Charles River Laboratories|WBA Walgreens Boots Alliance|AES AES Corporation|FFIV F5 Inc|WYNN Wynn Resorts|RCL Royal Caribbean|CCL Carnival Corporation|RL Ralph Lauren|LKQ LKQ Corporation|MTCH Match Group|MOS Mosaic Company|HST Host Hotels & Resorts|IPG Interpublic Group|CTLT Catalent|BWA BorgWarner|NWSA News Corp|FOXA Fox Corporation|PARA Paramount Global|DVA DaVita|AAL American Airlines|WHR Whirlpool|GNRC Generac Holdings|HAS Hasbro|BEN Franklin Resources|IVZ Invesco|NCLH Norwegian Cruise Line|UHS Universal Health Services|VFC VF Corporation|ALB Albemarle`;
+const US_STOCKS_RAW = `AAPL Apple|MSFT Microsoft|NVDA NVIDIA|AMZN Amazon|GOOGL Alphabet (A)|GOOG Alphabet (C)|META Meta Platforms|BRK.B Berkshire Hathaway|AVGO Broadcom|TSLA Tesla|LLY Eli Lilly|JPM JPMorgan Chase|V Visa|UNH UnitedHealth|XOM ExxonMobil|MA Mastercard|COST Costco|HD Home Depot|PG Procter & Gamble|JNJ Johnson & Johnson|NFLX Netflix|BAC Bank of America|CRM Salesforce|ABBV AbbVie|MRK Merck|KO Coca-Cola|CVX Chevron|AMD Advanced Micro Devices|PEP PepsiCo|ORCL Oracle|ADBE Adobe|TMO Thermo Fisher Scientific|WMT Walmart|LIN Linde|MCD McDonald's|CSCO Cisco|ACN Accenture|ABT Abbott Laboratories|DHR Danaher|WFC Wells Fargo|TXN Texas Instruments|GE General Electric|PM Philip Morris International|IBM IBM|CAT Caterpillar|VZ Verizon|INTU Intuit|NOW ServiceNow|AMAT Applied Materials|NEE NextEra Energy|CMCSA Comcast|ISRG Intuitive Surgical|AXP American Express|PFE Pfizer|UNP Union Pacific|DIS Walt Disney|QCOM Qualcomm|RTX RTX Corporation|SPGI S&P Global|LOW Lowe's|HON Honeywell|AMGN Amgen|BKNG Booking Holdings|COP ConocoPhillips|UPS United Parcel Service|T AT&T|BA Boeing|ELV Elevance Health|SYK Stryker|MS Morgan Stanley|BLK BlackRock|GS Goldman Sachs|MDT Medtronic|LMT Lockheed Martin|SBUX Starbucks|ADI Analog Devices|PLD Prologis|CB Chubb|TJX TJX Companies|GILD Gilead Sciences|MMC Marsh McLennan|VRTX Vertex Pharmaceuticals|C Citigroup|SCHW Charles Schwab|ETN Eaton|ADP Automatic Data Processing|CI Cigna|MO Altria|BSX Boston Scientific|REGN Regeneron Pharmaceuticals|SO Southern Company|ZTS Zoetis|PGR Progressive|FI Fiserv|DUK Duke Energy|EQIX Equinix|CME CME Group|MU Micron Technology|APH Amphenol|SHW Sherwin-Williams|AON Aon|ITW Illinois Tool Works|CL Colgate-Palmolive|TGT Target|CSX CSX Corporation|WM Waste Management|PNC PNC Financial|MCK McKesson|USB US Bancorp|NOC Northrop Grumman|CDNS Cadence Design Systems|EOG EOG Resources|FDX FedEx|MPC Marathon Petroleum|EMR Emerson Electric|SNPS Synopsys|APD Air Products|ICE Intercontinental Exchange|CMG Chipotle Mexican Grill|NSC Norfolk Southern|MAR Marriott International|ORLY O'Reilly Automotive|GD General Dynamics|ROP Roper Technologies|PXD Pioneer Natural Resources|PSA Public Storage|FCX Freeport-McMoRan|F Ford Motor|GM General Motors|OXY Occidental Petroleum|AJG Arthur J. Gallagher|TFC Truist Financial|AZO AutoZone|MSI Motorola Solutions|SRE Sempra Energy|TT Trane Technologies|CARR Carrier Global|ANET Arista Networks|HUM Humana|NXPI NXP Semiconductors|AEP American Electric Power|MET MetLife|PSX Phillips 66|ADM Archer-Daniels-Midland|WELL Welltower|DXCM Dexcom|PCAR Paccar|KLAC KLA Corporation|CTAS Cintas|D Dominion Energy|MCHP Microchip Technology|EW Edwards Lifesciences|COF Capital One|AIG American International Group|ROST Ross Stores|A Agilent Technologies|LHX L3Harris Technologies|MNST Monster Beverage|IQV IQVIA Holdings|CPRT Copart|SPG Simon Property Group|HES Hess Corporation|EXC Exelon|KMB Kimberly-Clark|PAYX Paychex|AFL Aflac|DOW Dow Inc|GIS General Mills|IDXX IDEXX Laboratories|BK BNY Mellon|OTIS Otis Worldwide|MSCI MSCI Inc|SYY Sysco|CTVA Corteva|CHTR Charter Communications|BIIB Biogen|VLO Valero Energy|ODFL Old Dominion Freight Line|WMB Williams Companies|HAL Halliburton|KMI Kinder Morgan|YUM Yum! Brands|PRU Prudential Financial|ALL Allstate|TEL TE Connectivity|CMI Cummins|DD DuPont|EA Electronic Arts|DVN Devon Energy|RSG Republic Services|GWW W.W. Grainger|NUE Nucor|ON ON Semiconductor|EL Estee Lauder|VRSK Verisk Analytics|ACGL Arch Capital Group|CTSH Cognizant Technology|ED Consolidated Edison|FTNT Fortinet|FAST Fastenal|HSY Hershey|XEL Xcel Energy|PEG Public Service Enterprise|GLW Corning|ROK Rockwell Automation|AMP Ameriprise Financial|PPG PPG Industries|APTV Aptiv|LEN Lennar|DLR Digital Realty Trust|WEC WEC Energy|KDP Keurig Dr Pepper|ANSS Ansys|KR Kroger|ES Eversource Energy|BKR Baker Hughes|ZBH Zimmer Biomet|VMC Vulcan Materials|DFS Discover Financial|MTD Mettler-Toledo|MLM Martin Marietta Materials|EIX Edison International|CDW CDW Corporation|FANG Diamondback Energy|TSCO Tractor Supply|WBD Warner Bros Discovery|AWK American Water Works|CBRE CBRE Group|HIG Hartford Financial|EFX Equifax|IT Gartner|RMD ResMed|WY Weyerhaeuser|GPN Global Payments|CAH Cardinal Health|STZ Constellation Brands|ULTA Ulta Beauty|GEHC GE HealthCare|ILMN Illumina|NDAQ Nasdaq Inc|DAL Delta Air Lines|CNC Centene|ETR Entergy|LYB LyondellBasell|VICI VICI Properties|LVS Las Vegas Sands|ROL Rollins|HPQ HP Inc|ARE Alexandria Real Estate|IRM Iron Mountain|K Kellanova|PCG PG&E|EBAY eBay|FE FirstEnergy|FITB Fifth Third Bancorp|WTW Willis Towers Watson|DHI D.R. Horton|MPWR Monolithic Power Systems|HPE Hewlett Packard Enterprise|NVR NVR Inc|RJF Raymond James|TDY Teledyne Technologies|VLTO Veralto|EXR Extra Space Storage|CHD Church & Dwight|LUV Southwest Airlines|CINF Cincinnati Financial|SBAC SBA Communications|MKC McCormick & Company|FSLR First Solar|STE Steris|BR Broadridge Financial|STT State Street|SYF Synchrony Financial|GPC Genuine Parts|EQR Equity Residential|TROW T. Rowe Price|CTRA Coterra Energy|AVB AvalonBay Communities|OKE ONEOK|HBAN Huntington Bancshares|DOV Dover Corporation|NTRS Northern Trust|EXPE Expedia Group|WAT Waters Corporation|WST West Pharmaceutical Services|DTE DTE Energy|PPL PPL Corporation|COO Cooper Companies|PHM PulteGroup|TYL Tyler Technologies|VTR Ventas|CMS CMS Energy|LDOS Leidos Holdings|AEE Ameren|NTAP NetApp|FDS FactSet Research|BALL Ball Corporation|PFG Principal Financial|MOH Molina Healthcare|CFG Citizens Financial|MRO Marathon Oil|TXT Textron|ATO Atmos Energy|LH Labcorp|J Jacobs Solutions|DGX Quest Diagnostics|CBOE Cboe Global Markets|IEX IDEX Corporation|CLX Clorox|SWKS Skyworks Solutions|POOL Pool Corporation|NDSN Nordson|ESS Essex Property Trust|MAA Mid-America Apartment|BAX Baxter International|MAS Masco|JBHT J.B. Hunt Transport|AKAM Akamai Technologies|CE Celanese|IFF International Flavors|ALGN Align Technology|INVH Invitation Homes|SJM J.M. Smucker|TER Teradyne|HRL Hormel Foods|EVRG Evergy|LNT Alliant Energy|PKI Revvity|NI NiSource|WRB W.R. Berkley|EPAM EPAM Systems|APA APA Corporation|HOLX Hologic|CAG Conagra Brands|BBY Best Buy|SNA Snap-on|ZBRA Zebra Technologies|TRMB Trimble|SWK Stanley Black & Decker|JKHY Jack Henry & Associates|UDR UDR Inc|KEY KeyCorp|CPT Camden Property Trust|CF CF Industries|PNR Pentair|EMN Eastman Chemical|BXP BXP Inc|NRG NRG Energy|GEN Gen Digital|PAYC Paycom Software|MGM MGM Resorts|CRL Charles River Laboratories|WBA Walgreens Boots Alliance|AES AES Corporation|FFIV F5 Inc|WYNN Wynn Resorts|RCL Royal Caribbean|CCL Carnival Corporation|RL Ralph Lauren|LKQ LKQ Corporation|MTCH Match Group|MOS Mosaic Company|HST Host Hotels & Resorts|IPG Interpublic Group|CTLT Catalent|BWA BorgWarner|NWSA News Corp|FOXA Fox Corporation|PARA Paramount Global|DVA DaVita|AAL American Airlines|WHR Whirlpool|GNRC Generac Holdings|HAS Hasbro|BEN Franklin Resources|IVZ Invesco|NCLH Norwegian Cruise Line|UHS Universal Health Services|VFC VF Corporation|ALB Albemarle` +
+  `|TTWO Take-Two Interactive|RBLX Roblox|U Unity Software|DKNG DraftKings|ABNB Airbnb|UBER Uber Technologies|LYFT Lyft|DASH DoorDash|SNOW Snowflake|PLTR Palantir Technologies|NET Cloudflare|DDOG Datadog|CRWD CrowdStrike|ZS Zscaler|PANW Palo Alto Networks|OKTA Okta|TEAM Atlassian|WDAY Workday|SHOP Shopify|SQ Block|PYPL PayPal|COIN Coinbase Global|HOOD Robinhood Markets|SOFI SoFi Technologies|AFRM Affirm Holdings|UPST Upstart Holdings|MSTR MicroStrategy|MARA MARA Holdings|RIOT Riot Platforms|CLSK CleanSpark|APP AppLovin|TTD The Trade Desk|ROKU Roku|PINS Pinterest|SNAP Snap Inc|SPOT Spotify Technology|ZM Zoom Communications|DOCU DocuSign|TWLO Twilio|ESTC Elastic|MDB MongoDB|CFLT Confluent|GTLB GitLab|HUBS HubSpot|BILL Bill.com|PATH UiPath|AI C3.ai|SMCI Super Micro Computer|ARM Arm Holdings|WOLF Wolfspeed|LSCC Lattice Semiconductor|QRVO Qorvo|ENPH Enphase Energy|SEDG SolarEdge Technologies|RUN Sunrun|PLUG Plug Power|BE Bloom Energy|CHPT ChargePoint Holdings|LCID Lucid Group|RIVN Rivian Automotive|NIO NIO Inc|XPEV XPeng|LI Li Auto|BYDDY BYD Company|VWAGY Volkswagen|TM Toyota Motor|HMC Honda Motor|SONY Sony Group|BABA Alibaba Group|JD JD.com|PDD PDD Holdings|BIDU Baidu|NTES NetEase|TCEHY Tencent Holdings|TME Tencent Music|BILI Bilibili|IQ iQIYI|MELI MercadoLibre|SE Sea Limited|GRAB Grab Holdings|CPNG Coupang|INFY Infosys|WIT Wipro|TTE TotalEnergies|SHEL Shell|BP BP plc|E Eni|EQNR Equinor|SU Suncor Energy|CNQ Canadian Natural Resources|ENB Enbridge|TRP TC Energy|NVS Novartis|AZN AstraZeneca|GSK GSK plc|SNY Sanofi|RHHBY Roche Holding|NVO Novo Nordisk|UL Unilever|NSRGY Nestle|DEO Diageo|BUD Anheuser-Busch InBev|MDLZ Mondelez International|KHC Kraft Heinz|HSBC HSBC Holdings|BCS Barclays|DB Deutsche Bank|UBS UBS Group|ING ING Groep|SAN Banco Santander|BBVA Banco Bilbao Vizcaya|TD Toronto-Dominion Bank|RY Royal Bank of Canada|BNS Bank of Nova Scotia|BMO Bank of Montreal|SAP SAP SE|ASML ASML Holding|STM STMicroelectronics|ERIC Ericsson|NOK Nokia|SIEGY Siemens|BASFY BASF|AIQUY Airbus|BAESY BAE Systems|VOD Vodafone Group|TEF Telefonica|ORAN Orange S.A.|DTEGY Deutsche Telekom|AMX America Movil|CVS CVS Health|COR Cencora`;
 
 const US_STOCKS = US_STOCKS_RAW.split('|').map((entry) => {
   const [code, ...nameParts] = entry.split(' ');
@@ -373,6 +446,7 @@ export const SYMBOL_CATALOG: SymbolDef[] = [${catalog.combineExpr}].flat();
 
 export const CATEGORY_LABELS_TR: Record<string, string> = {
   crypto: 'Kripto',
+  crypto_futures: 'Kripto Vadeli',
   forex: 'Forex',
   commodity: 'Emtia',
   bist: 'BIST',
@@ -388,8 +462,8 @@ export function findSymbol(symbol: string): SymbolDef | undefined {
 }
 
 async function main() {
-  const crypto = await fetchCryptoSymbols();
-  const combined = [...crypto, ...FOREX, ...COMMODITIES, ...BIST, ...US_STOCKS, ...ETFS, ...INDICES];
+  const [crypto, futures] = await Promise.all([fetchCryptoSymbols(), fetchFuturesSymbols()]);
+  const combined = [...crypto, ...futures, ...FOREX, ...COMMODITIES, ...BIST, ...US_STOCKS, ...ETFS, ...INDICES];
 
   // Global safety net: the same canonical symbol id must never appear
   // twice across categories (breaks React list keys and findSymbol()).

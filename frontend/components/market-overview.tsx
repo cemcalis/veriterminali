@@ -2,30 +2,28 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Radio, Layers } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
-import { SYMBOL_CATALOG } from '@/lib/symbols';
 
 const CARDS = [
-  { key: 'total', label: 'Toplam Enstrüman', icon: Layers, tone: 'text-sky-400' },
-  { key: 'live', label: 'Canlı Akışta', icon: Radio, tone: 'text-emerald-400' },
   { key: 'gainers', label: 'Yükselenler', icon: TrendingUp, tone: 'text-emerald-400' },
   { key: 'losers', label: 'Düşenler', icon: TrendingDown, tone: 'text-red-400' },
+  { key: 'watchlist', label: 'İzleme Listem', icon: Star, tone: 'text-amber-400' },
 ] as const;
 
 export function MarketOverview() {
   const quotes = useMarketStore((s) => s.quotes);
+  const watchlist = useMarketStore((s) => s.watchlist);
 
   const stats = useMemo(() => {
     const values = Object.values(quotes);
-    const live = values.length;
     const gainers = values.filter((q) => (q.changePercent ?? 0) > 0).length;
     const losers = values.filter((q) => (q.changePercent ?? 0) < 0).length;
-    return { total: SYMBOL_CATALOG.length, live, gainers, losers };
-  }, [quotes]);
+    return { gainers, losers, watchlist: watchlist.length };
+  }, [quotes, watchlist]);
 
   return (
-    <div className="px-4 pt-3 grid grid-cols-4 gap-2">
+    <div className="px-4 pt-3 grid grid-cols-3 gap-2">
       {CARDS.map((card, i) => {
         const Icon = card.icon;
         return (

@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, XCircle, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useMarketStore } from '@/lib/store';
 import type { ProviderHealth } from '@/lib/types';
 
+/** Developer-mode-only widget. Provider names/latency are internal
+ * implementation details and must never appear in the default public UI
+ * -- this renders nothing unless debug mode is on (Ayarlar). */
 export function ProviderHealthStrip() {
+  const debugMode = useMarketStore((s) => s.debugMode);
   const [providers, setProviders] = useState<ProviderHealth[] | null>(null);
 
   useEffect(() => {
+    if (!debugMode) return;
     let cancelled = false;
     async function refresh() {
       try {
@@ -25,12 +31,14 @@ export function ProviderHealthStrip() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [debugMode]);
+
+  if (!debugMode) return null;
 
   return (
     <section className="px-4 pt-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Sağlayıcı Durumu</h2>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Sağlayıcı Durumu (geliştirici)</h2>
         <Link href="/ayarlar" className="flex items-center gap-0.5 text-[11px] text-emerald-400">
           Detay <ChevronRight size={12} />
         </Link>

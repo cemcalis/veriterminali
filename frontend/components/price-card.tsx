@@ -57,7 +57,7 @@ export function PriceCard({ def }: { def: SymbolDef }) {
           {changePercent !== null ? `${isUp ? '+' : ''}${changePercent.toFixed(2)}%` : quote ? '·' : 'yükleniyor'}
         </div>
         <div className="flex justify-end mt-0.5">
-          <StatusBadge status={quote?.status} compact />
+          <StatusBadge status={quote?.status} />
         </div>
         {debugMode && quote && (
           <div className="text-[9px] text-slate-600">
