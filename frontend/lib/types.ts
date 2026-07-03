@@ -125,6 +125,23 @@ export interface ScannerPreset {
   createdAt: number;
 }
 
+export type DisclosureCategory =
+  | 'temettu'
+  | 'sermaye_artirimi'
+  | 'birlesme_devralma'
+  | 'genel_kurul'
+  | 'finansal_rapor'
+  | 'spk_karari'
+  | 'diger';
+
+export interface NewsItem {
+  publishDate: string;
+  disclosureIndex: string;
+  title: string;
+  url: string;
+  category: DisclosureCategory;
+}
+
 export type InstitutionalResult<T> =
   | { available: true; data: T; asOf: number; source: string }
   | { available: false; reason: 'licensed_data_required'; message: string; vendorOptions: string[] };
