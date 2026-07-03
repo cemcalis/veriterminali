@@ -1,0 +1,20 @@
+{
+  "name": "veri-terminali-provider-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Provider connectivity testing layer for Veri Terminali",
+  "type": "module",
+  "scripts": {
+    "test:providers": "tsx scripts/test-providers.ts"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.13"
+  }
+}
