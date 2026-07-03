@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { MarketHub } from '../market-hub.js';
-import { SYMBOL_CATALOG, findSymbol, symbolsByCategory } from '../../../src/symbols.js';
 import type { MarketCategory, CandleInterval } from '../../../src/providers/market-provider.interface.js';
 
 const VALID_INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -10,12 +9,33 @@ export function marketRouter(hub: MarketHub) {
 
   router.get('/symbols', (req, res) => {
     const category = req.query.category as MarketCategory | undefined;
-    res.json({ symbols: category ? symbolsByCategory(category) : SYMBOL_CATALOG });
+    const all = hub.fullCatalog();
+    res.json({ symbols: category ? all.filter((s) => s.category === category) : all });
+  });
+
+  /** Local + dynamic symbol search. Always checks the local catalog
+   * first (instant); only reaches out to live providers when nothing
+   * matches locally, so the app feels like it can search any real
+   * instrument without a slow round-trip for common tickers. */
+  router.get('/search', async (req, res) => {
+    const q = String(req.query.q ?? '').trim();
+    if (q.length < 1) return res.json({ results: [], discovered: false });
+
+    const local = hub.searchLocal(q, 20);
+    if (local.length > 0) return res.json({ results: local, discovered: false });
+
+    if (q.length < 2) return res.json({ results: [], discovered: false });
+    try {
+      const found = await hub.searchDynamic(q);
+      res.json({ results: found, discovered: true });
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'search failed', results: [] });
+    }
   });
 
   router.get('/quote/:symbol', async (req, res) => {
     const symbol = decodeURIComponent(req.params.symbol);
-    const def = findSymbol(symbol);
+    const def = hub.findDef(symbol);
     if (!def) return res.status(404).json({ error: 'unknown symbol' });
     const quote = await hub.getQuoteWithFallback(def);
     if (!quote) return res.status(502).json({ error: 'no provider returned data for this symbol' });
@@ -32,13 +52,13 @@ export function marketRouter(hub: MarketHub) {
     if (!VALID_INTERVALS.includes(interval)) {
       return res.status(400).json({ error: `interval must be one of ${VALID_INTERVALS.join(', ')}` });
     }
-    const def = findSymbol(symbol);
+    const def = hub.findDef(symbol);
     if (!def) return res.status(404).json({ error: 'unknown symbol' });
 
     try {
-      const provider = def.category === 'crypto' ? hub.registry.get('binance')! : hub.registry.get('tradingview-twc')!;
-      const candles = await provider.getCandles(symbol, interval, 200);
-      res.json({ candles, provider: provider.id, experimental: provider.experimental });
+      const { candles, providerId } = await hub.getCandlesFor(def, interval, 200);
+      const provider = hub.registry.get(providerId);
+      res.json({ candles, provider: providerId, experimental: provider?.experimental ?? false });
     } catch (err) {
       res.status(502).json({ error: err instanceof Error ? err.message : 'candle fetch failed' });
     }

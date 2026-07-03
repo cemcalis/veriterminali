@@ -82,3 +82,29 @@ export interface WatchlistItem {
   symbol: string;
   addedAt: number;
 }
+
+export interface ScannerRow {
+  symbol: string;
+  category: MarketCategory;
+  displayNameTr: string;
+  quote: Quote;
+  rsi14: number | null;
+}
+
+export interface ScannerFilters {
+  category?: MarketCategory;
+  minChangePercent?: number;
+  maxChangePercent?: number;
+  minVolume?: number;
+  rsi?: 'oversold' | 'overbought';
+  sort?: 'changePercent' | 'volume' | 'price';
+  direction?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface ScannerPreset {
+  id: string;
+  name: string;
+  filters: Record<string, string | number>;
+  createdAt: number;
+}
