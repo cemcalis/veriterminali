@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Home, BarChart3, LineChart, Briefcase, Bell, Settings } from 'lucide-react';
+import type { ComponentType } from 'react';
 
-const ITEMS = [
-  { href: '/', label: 'Anasayfa', icon: '🏠' },
-  { href: '/piyasalar', label: 'Piyasalar', icon: '📊' },
-  { href: '/grafik', label: 'Grafik', icon: '📈' },
-  { href: '/portfoy', label: 'Portföy', icon: '💼' },
-  { href: '/alarm', label: 'Alarm', icon: '🔔' },
-  { href: '/ayarlar', label: 'Ayarlar', icon: '⚙️' },
+const ITEMS: { href: string; label: string; icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
+  { href: '/', label: 'Anasayfa', icon: Home },
+  { href: '/piyasalar', label: 'Piyasalar', icon: BarChart3 },
+  { href: '/grafik', label: 'Grafik', icon: LineChart },
+  { href: '/portfoy', label: 'Portföy', icon: Briefcase },
+  { href: '/alarm', label: 'Alarm', icon: Bell },
+  { href: '/ayarlar', label: 'Ayarlar', icon: Settings },
 ];
 
 export function BottomNav() {
@@ -19,15 +21,16 @@ export function BottomNav() {
       <div className="max-w-lg mx-auto grid grid-cols-6">
         {ITEMS.map((item) => {
           const active = pathname === item.href;
+          const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 py-2 text-[10px] ${
-                active ? 'text-emerald-400' : 'text-slate-500'
+              className={`flex flex-col items-center gap-1 py-2 text-[10px] transition-colors ${
+                active ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <span className="text-base leading-none">{item.icon}</span>
+              <Icon size={18} strokeWidth={active ? 2.25 : 1.75} />
               {item.label}
             </Link>
           );

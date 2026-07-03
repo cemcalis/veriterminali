@@ -4,7 +4,11 @@ export type MarketCategory =
   | 'commodity'
   | 'bist'
   | 'us_stock'
+  | 'etf'
   | 'index';
+
+/** Coarse freshness classification shown in the UI for every symbol. */
+export type DataStatus = 'live' | 'near-live' | 'delayed' | 'fallback' | 'unavailable';
 
 export interface Quote {
   symbol: string;
@@ -20,6 +24,8 @@ export interface Quote {
   delayed: boolean;
   /** true if the provider/protocol is unofficial/reverse-engineered */
   experimental: boolean;
+  /** coarse freshness classification derived from provider + tick age */
+  status?: DataStatus;
 }
 
 export interface Candle {

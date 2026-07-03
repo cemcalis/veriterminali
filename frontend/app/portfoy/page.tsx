@@ -1,16 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Trash2, Wallet, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SYMBOL_CATALOG } from '@/lib/symbols';
+import { useSymbolSubscription } from '@/lib/use-market-socket';
 import type { Position } from '@/lib/types';
 
 export default function PortfoyPage() {
   const [positions, setPositions] = useState<Position[]>([]);
+  const [symbolInput, setSymbolInput] = useState(`${SYMBOL_CATALOG[0].displayNameTr} (${SYMBOL_CATALOG[0].symbol})`);
   const [symbol, setSymbol] = useState(SYMBOL_CATALOG[0].symbol);
   const [quantity, setQuantity] = useState('');
   const [avgCost, setAvgCost] = useState('');
   const [loading, setLoading] = useState(true);
+
+  useSymbolSubscription(positions.map((p) => p.symbol));
 
   async function refresh() {
     const res = await api.portfolio.list();
@@ -47,7 +52,8 @@ export default function PortfoyPage() {
 
   return (
     <div className="pb-4">
-      <header className="px-3 pt-4">
+      <header className="px-3 pt-4 flex items-center gap-2">
+        <Wallet size={18} className="text-emerald-400" />
         <h1 className="text-lg font-bold">Portföy</h1>
       </header>
 
@@ -64,13 +70,22 @@ export default function PortfoyPage() {
 
       <form onSubmit={addPosition} className="mx-3 mt-3 panel p-3 flex flex-col gap-2">
         <div className="text-xs text-slate-400 font-medium">Pozisyon Ekle</div>
-        <select value={symbol} onChange={(e) => setSymbol(e.target.value)} className="panel px-2 py-2 text-sm">
+        <input
+          list="symbol-options-portfoy"
+          value={symbolInput}
+          onChange={(e) => {
+            setSymbolInput(e.target.value);
+            const match = SYMBOL_CATALOG.find((s) => `${s.displayNameTr} (${s.symbol})` === e.target.value);
+            if (match) setSymbol(match.symbol);
+          }}
+          placeholder="Sembol ara..."
+          className="panel px-2 py-2 text-sm outline-none"
+        />
+        <datalist id="symbol-options-portfoy">
           {SYMBOL_CATALOG.map((s) => (
-            <option key={s.symbol} value={s.symbol}>
-              {s.displayNameTr} ({s.symbol})
-            </option>
+            <option key={s.symbol} value={`${s.displayNameTr} (${s.symbol})`} />
           ))}
-        </select>
+        </datalist>
         <div className="flex gap-2">
           <input
             value={quantity}
@@ -89,8 +104,11 @@ export default function PortfoyPage() {
             className="panel px-2 py-2 text-sm flex-1 outline-none"
           />
         </div>
-        <button type="submit" className="bg-emerald-500/20 text-emerald-300 rounded-lg py-2 text-sm">
-          Ekle
+        <button
+          type="submit"
+          className="flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 rounded-lg py-2 text-sm"
+        >
+          <Plus size={15} /> Ekle
         </button>
       </form>
 
@@ -117,8 +135,11 @@ export default function PortfoyPage() {
                     {p.pnl.toFixed(2)} ({p.pnlPercent?.toFixed(2)}%)
                   </div>
                 )}
-                <button onClick={() => removePosition(p.id)} className="text-[10px] text-slate-500 underline mt-1">
-                  Sil
+                <button
+                  onClick={() => removePosition(p.id)}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 mt-1 ml-auto"
+                >
+                  <Trash2 size={11} /> Sil
                 </button>
               </div>
             </div>

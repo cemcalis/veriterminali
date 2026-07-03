@@ -1,6 +1,6 @@
 # Provider Test Report
 
-Generated: 2026-07-03T15:50:17.540Z
+Generated: 2026-07-03T18:35:10.734Z
 
 ## Summary
 
@@ -19,180 +19,180 @@ Generated: 2026-07-03T15:50:17.540Z
 
 - Realtime: true
 - Experimental/unofficial: false
-- Health: OK (1268ms) — OK
+- Health: OK (675ms) — OK
 
 ### crypto (3/3 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BINANCE:BTCUSDT | OK | 61913.82 | 838ms |
-| BINANCE:ETHUSDT | OK | 1734.43 | 532ms |
-| BINANCE:SOLUSDT | OK | 81.29 | 563ms |
+| BINANCE:BTCUSDT | OK | 62193 | 528ms |
+| BINANCE:ETHUSDT | OK | 1738.54 | 306ms |
+| BINANCE:SOLUSDT | OK | 81.81 | 410ms |
 
 ## TradingView (twc-style quote session) (`tradingview-twc`)
 
 - Realtime: true
 - Experimental/unofficial: true
-- Health: OK (1115ms) — OK (experimental/unofficial)
+- Health: OK (375ms) — OK (experimental/unofficial)
 
 ### crypto (3/3 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BINANCE:BTCUSDT | OK | 61913.82 | 421ms |
-| BINANCE:ETHUSDT | OK | 1734.43 | 251ms |
-| BINANCE:SOLUSDT | OK | 81.3 | 165ms |
+| BINANCE:BTCUSDT | OK | 62193 | 159ms |
+| BINANCE:ETHUSDT | OK | 1738.54 | 150ms |
+| BINANCE:SOLUSDT | OK | 81.81 | 149ms |
 
 ### forex (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| EURUSD (as FX:EURUSD) | OK | 1.14389 | 188ms |
-| GBPUSD (as FX:GBPUSD) | OK | 1.33525 | 164ms |
-| USDTRY (as FX_IDC:USDTRY) | OK | 46.7994 | 150ms |
-| XAUUSD (as OANDA:XAUUSD) | OK | 4167.985 | 238ms |
-| XAGUSD (as OANDA:XAGUSD) | OK | 62.3065 | 186ms |
+| EURUSD (as FX:EURUSD) | OK | 1.14394 | 146ms |
+| GBPUSD (as FX:GBPUSD) | OK | 1.3356 | 151ms |
+| USDTRY (as FX_IDC:USDTRY) | OK | 46.799 | 138ms |
+| XAUUSD (as OANDA:XAUUSD) | OK | 4175.695 | 224ms |
+| XAGUSD (as OANDA:XAGUSD) | OK | 62.403 | 132ms |
 
 ### commodity (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| GOLD (as TVC:GOLD) | OK | 4167.836 | 168ms |
-| SILVER (as TVC:SILVER) | OK | 62.2932 | 161ms |
-| USOIL (as TVC:USOIL) | OK | 68.67 | 149ms |
-| BRENT (as BLACKBULL:BRENT) | OK | 71.985 | 222ms |
-| NATGAS | OK | 3.216 | 194ms |
+| GOLD (as TVC:GOLD) | OK | 4174.76 | 130ms |
+| SILVER (as TVC:SILVER) | OK | 62.3724 | 120ms |
+| USOIL (as TVC:USOIL) | OK | 68.77 | 130ms |
+| BRENT (as BLACKBULL:BRENT) | OK | 72.115 | 165ms |
+| NATGAS | OK | 3.22 | 125ms |
 
 ### bist (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BIST:XU100 | OK | 14417.91 | 250ms |
-| BIST:THYAO | OK | 334 | 306ms |
-| BIST:ASELS | OK | 399.5 | 301ms |
-| BIST:KCHOL | OK | 189.6 | 228ms |
-| BIST:SISE | OK | 44.34 | 166ms |
+| BIST:XU100 | OK | 14417.91 | 157ms |
+| BIST:THYAO | OK | 334 | 163ms |
+| BIST:ASELS | OK | 399.5 | 277ms |
+| BIST:KCHOL | OK | 189.6 | 165ms |
+| BIST:SISE | OK | 44.34 | 153ms |
 
 ### us_stock (6/6 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| AAPL | OK | 308.63 | 208ms |
-| TSLA | OK | 393.45 | 178ms |
-| NVDA | OK | 194.83 | 184ms |
-| MSFT | OK | 390.49 | 168ms |
-| SPY | OK | 744.78 | 190ms |
-| QQQ | OK | 712.6 | 254ms |
+| AAPL | OK | 308.63 | 265ms |
+| TSLA | OK | 393.45 | 210ms |
+| NVDA | OK | 194.83 | 100ms |
+| MSFT | OK | 390.49 | 234ms |
+| SPY | OK | 744.78 | 226ms |
+| QQQ | OK | 712.6 | 262ms |
 
 ## TradingView (OHLCV microservice-style) (`tradingview-microservice`)
 
 - Realtime: true
 - Experimental/unofficial: true
-- Health: OK (7471ms) — OK (experimental/unofficial)
+- Health: OK (6397ms) — OK (experimental/unofficial)
 
 ### crypto (3/3 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BINANCE:BTCUSDT | OK | 61850.01 | 6001ms |
-| BINANCE:ETHUSDT | OK | 1733.33 | 6003ms |
-| BINANCE:SOLUSDT | OK | 81.26 | 6008ms |
+| BINANCE:BTCUSDT | OK | 62196 | 6001ms |
+| BINANCE:ETHUSDT | OK | 1738.87 | 6003ms |
+| BINANCE:SOLUSDT | OK | 81.82 | 6004ms |
 
 ### forex (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| EURUSD (as FX:EURUSD) | OK | 1.14387 | 6008ms |
-| GBPUSD (as FX:GBPUSD) | OK | 1.33526 | 6003ms |
-| USDTRY (as FX_IDC:USDTRY) | OK | 46.7966 | 6014ms |
-| XAUUSD (as OANDA:XAUUSD) | OK | 4168.525 | 6006ms |
-| XAGUSD (as OANDA:XAGUSD) | OK | 62.339 | 6000ms |
+| EURUSD (as FX:EURUSD) | OK | 1.14392 | 6007ms |
+| GBPUSD (as FX:GBPUSD) | OK | 1.33563 | 6008ms |
+| USDTRY (as FX_IDC:USDTRY) | OK | 46.7978 | 6010ms |
+| XAUUSD (as OANDA:XAUUSD) | OK | 4175.695 | 6006ms |
+| XAGUSD (as OANDA:XAGUSD) | OK | 62.403 | 6003ms |
 
 ### commodity (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| GOLD (as TVC:GOLD) | OK | 4168.841 | 6014ms |
-| SILVER (as TVC:SILVER) | OK | 62.3262 | 6014ms |
-| USOIL (as TVC:USOIL) | OK | 68.7 | 6005ms |
-| BRENT (as BLACKBULL:BRENT) | OK | 71.995 | 6009ms |
-| NATGAS | OK | 3.217 | 6003ms |
+| GOLD (as TVC:GOLD) | OK | 4174.76 | 6001ms |
+| SILVER (as TVC:SILVER) | OK | 62.3724 | 6013ms |
+| USOIL (as TVC:USOIL) | OK | 68.77 | 6008ms |
+| BRENT (as BLACKBULL:BRENT) | OK | 72.115 | 6008ms |
+| NATGAS | OK | 3.22 | 6004ms |
 
 ### bist (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BIST:XU100 | OK | 14417.91 | 6013ms |
-| BIST:THYAO | OK | 334 | 6006ms |
-| BIST:ASELS | OK | 399.5 | 6013ms |
+| BIST:XU100 | OK | 14417.91 | 6007ms |
+| BIST:THYAO | OK | 334 | 6008ms |
+| BIST:ASELS | OK | 399.5 | 6006ms |
 | BIST:KCHOL | OK | 189.6 | 6013ms |
-| BIST:SISE | OK | 44.34 | 6000ms |
+| BIST:SISE | OK | 44.34 | 6006ms |
 
 ### us_stock (6/6 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| AAPL | OK | 308.27 | 6011ms |
-| TSLA | OK | 393.24 | 6008ms |
-| NVDA | OK | 194.69 | 6010ms |
-| MSFT | OK | 389.83 | 6002ms |
-| SPY | OK | 745.2 | 6003ms |
-| QQQ | OK | 712.7 | 6014ms |
+| AAPL | OK | 308.27 | 6004ms |
+| TSLA | OK | 393.24 | 6002ms |
+| NVDA | OK | 194.69 | 6007ms |
+| MSFT | OK | 389.83 | 6016ms |
+| SPY | OK | 745.2 | 6018ms |
+| QQQ | OK | 712.7 | 6007ms |
 
 ## TradingView (quote+candle client-style) (`tradingview-ws-client`)
 
 - Realtime: true
 - Experimental/unofficial: true
-- Health: OK (613ms) — OK (experimental/unofficial)
+- Health: OK (1032ms) — OK (experimental/unofficial)
 
 ### crypto (3/3 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BINANCE:BTCUSDT | OK | 61845.39 | 944ms |
-| BINANCE:ETHUSDT | OK | 1732.79 | 440ms |
-| BINANCE:SOLUSDT | OK | 81.2 | 381ms |
+| BINANCE:BTCUSDT | OK | 62206.01 | 176ms |
+| BINANCE:ETHUSDT | OK | 1739.05 | 243ms |
+| BINANCE:SOLUSDT | OK | 81.82 | 193ms |
 
 ### forex (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| EURUSD (as FX:EURUSD) | OK | 1.14392 | 444ms |
-| GBPUSD (as FX:GBPUSD) | OK | 1.33534 | 599ms |
-| USDTRY (as FX_IDC:USDTRY) | OK | 46.7992 | 705ms |
-| XAUUSD (as OANDA:XAUUSD) | OK | 4168.6 | 639ms |
-| XAGUSD (as OANDA:XAGUSD) | OK | 62.3305 | 429ms |
+| EURUSD (as FX:EURUSD) | OK | 1.14394 | 239ms |
+| GBPUSD (as FX:GBPUSD) | OK | 1.33564 | 275ms |
+| USDTRY (as FX_IDC:USDTRY) | OK | 46.7992 | 419ms |
+| XAUUSD (as OANDA:XAUUSD) | OK | 4175.695 | 629ms |
+| XAGUSD (as OANDA:XAGUSD) | OK | 62.403 | 311ms |
 
 ### commodity (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| GOLD (as TVC:GOLD) | OK | 4168.44 | 470ms |
-| SILVER (as TVC:SILVER) | OK | 62.3152 | 442ms |
-| USOIL (as TVC:USOIL) | OK | 68.7 | 474ms |
-| BRENT (as BLACKBULL:BRENT) | OK | 71.985 | 427ms |
-| NATGAS | OK | 3.218 | 416ms |
+| GOLD (as TVC:GOLD) | OK | 4174.76 | 275ms |
+| SILVER (as TVC:SILVER) | OK | 62.3724 | 207ms |
+| USOIL (as TVC:USOIL) | OK | 68.77 | 210ms |
+| BRENT (as BLACKBULL:BRENT) | OK | 72.115 | 154ms |
+| NATGAS | OK | 3.22 | 299ms |
 
 ### bist (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BIST:XU100 | OK | 14417.91 | 352ms |
-| BIST:THYAO | OK | 334 | 264ms |
-| BIST:ASELS | OK | 399.5 | 185ms |
-| BIST:KCHOL | OK | 189.6 | 189ms |
-| BIST:SISE | OK | 44.34 | 244ms |
+| BIST:XU100 | OK | 14417.91 | 130ms |
+| BIST:THYAO | OK | 334 | 259ms |
+| BIST:ASELS | OK | 399.5 | 209ms |
+| BIST:KCHOL | OK | 189.6 | 149ms |
+| BIST:SISE | OK | 44.34 | 160ms |
 
-### us_stock (5/6 working)
+### us_stock (6/6 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| AAPL | OK | 308.63 | 397ms |
-| TSLA | OK | 393.45 | 341ms |
-| NVDA | OK | 194.83 | 576ms |
-| MSFT | OK | 390.49 | 328ms |
-| SPY | FAIL: timeout 8s | - | 8009ms |
-| QQQ | OK | 712.6 | 6138ms |
+| AAPL | OK | 308.63 | 149ms |
+| TSLA | OK | 393.45 | 117ms |
+| NVDA | OK | 194.83 | 169ms |
+| MSFT | OK | 390.49 | 160ms |
+| SPY | OK | 744.78 | 165ms |
+| QQQ | OK | 712.6 | 149ms |
 
 ## StockerAPI / Kun Data (BIST, paid) (`stockerapi`)
 
@@ -220,7 +220,7 @@ Generated: 2026-07-03T15:50:17.540Z
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| AAPL | FAIL: no price returned | - | 1ms |
+| AAPL | FAIL: no price returned | - | 0ms |
 | TSLA | FAIL: no price returned | - | 0ms |
 | NVDA | FAIL: no price returned | - | 0ms |
 | MSFT | FAIL: no price returned | - | 0ms |
@@ -294,48 +294,48 @@ Generated: 2026-07-03T15:50:17.540Z
 
 - Realtime: false
 - Experimental/unofficial: true
-- Health: OK (2826ms) — OK (unofficial, delayed)
+- Health: OK (602ms) — OK (unofficial, delayed)
 
 ### us_stock (6/6 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| AAPL | OK | 308.63 | 2903ms |
-| TSLA | OK | 393.45 | 2232ms |
-| NVDA | OK | 194.83 | 1005ms |
-| MSFT | OK | 390.49 | 540ms |
-| SPY | OK | 744.78 | 375ms |
-| QQQ | OK | 712.6 | 1050ms |
+| AAPL | OK | 308.63 | 447ms |
+| TSLA | OK | 393.45 | 326ms |
+| NVDA | OK | 194.83 | 163ms |
+| MSFT | OK | 390.49 | 115ms |
+| SPY | OK | 744.78 | 135ms |
+| QQQ | OK | 712.6 | 81ms |
 
 ### forex (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| EURUSD | OK | 1.1443 | 1640ms |
-| GBPUSD | OK | 1.3354 | 1341ms |
-| USDTRY | OK | 46.7979 | 2416ms |
-| XAUUSD | OK | 4179.9 | 1679ms |
-| XAGUSD | OK | 62.745 | 769ms |
+| EURUSD | OK | 1.1443 | 109ms |
+| GBPUSD | OK | 1.3357 | 135ms |
+| USDTRY | OK | 46.7981 | 124ms |
+| XAUUSD | OK | 4187.3 | 113ms |
+| XAGUSD | OK | 62.815 | 185ms |
 
 ### commodity (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| GOLD | OK | 4179.9 | 2153ms |
-| SILVER | OK | 62.725 | 901ms |
-| USOIL | OK | 68.77 | 165ms |
-| BRENT | OK | 72.09 | 120ms |
-| NATGAS | OK | 3.237 | 299ms |
+| GOLD | OK | 4187.3 | 77ms |
+| SILVER | OK | 62.815 | 85ms |
+| USOIL | OK | 68.78 | 88ms |
+| BRENT | OK | 72.13 | 117ms |
+| NATGAS | OK | 3.245 | 132ms |
 
 ### bist (5/5 working)
 
 | Symbol | Status | Price | Latency |
 |---|---|---|---|
-| BIST:XU100 | OK | 14417.91 | 385ms |
-| BIST:THYAO | OK | 334 | 500ms |
-| BIST:ASELS | OK | 399.5 | 469ms |
-| BIST:KCHOL | OK | 189.6 | 500ms |
-| BIST:SISE | OK | 44.34 | 459ms |
+| BIST:XU100 | OK | 14417.91 | 129ms |
+| BIST:THYAO | OK | 334 | 132ms |
+| BIST:ASELS | OK | 399.5 | 156ms |
+| BIST:KCHOL | OK | 189.6 | 171ms |
+| BIST:SISE | OK | 44.34 | 214ms |
 
 ## Conclusions & Recommended Routing
 

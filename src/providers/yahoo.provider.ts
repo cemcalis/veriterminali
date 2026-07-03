@@ -51,7 +51,7 @@ export class YahooProvider implements MarketProvider {
   readonly name = 'Yahoo Finance (unofficial, delayed fallback)';
   readonly isRealtime = false;
   readonly experimental = true;
-  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'commodity', 'bist', 'index'];
+  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'commodity', 'bist', 'etf', 'index'];
 
   async connect(): Promise<void> {}
   async disconnect(): Promise<void> {}

@@ -50,3 +50,13 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+.skeleton {
+  background: var(--border);
+  border-radius: 0.375rem;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}

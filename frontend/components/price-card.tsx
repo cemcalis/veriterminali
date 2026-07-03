@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMarketStore } from '@/lib/store';
 import type { SymbolDef } from '@/lib/types';
+import { StatusBadge } from './status-badge';
 
 function formatPrice(price: number | null): string {
   if (price === null) return '—';
@@ -31,11 +32,13 @@ export function PriceCard({ def }: { def: SymbolDef }) {
         <div className={`text-[11px] font-mono ${isUp ? 'price-up' : changePercent !== null ? 'price-down' : 'text-slate-500'}`}>
           {changePercent !== null ? `${isUp ? '+' : ''}${changePercent.toFixed(2)}%` : quote ? '·' : 'yükleniyor'}
         </div>
+        <div className="flex justify-end mt-0.5">
+          <StatusBadge status={quote?.status} compact />
+        </div>
         {debugMode && quote && (
           <div className="text-[9px] text-slate-600">
             {quote.provider}
             {quote.experimental ? ' (deneysel)' : ''}
-            {quote.delayed ? ' · gecikmeli' : ''}
           </div>
         )}
       </div>

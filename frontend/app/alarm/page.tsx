@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Trash2, Bell, Plus, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SYMBOL_CATALOG } from '@/lib/symbols';
 import type { Alert } from '@/lib/types';
 
 export default function AlarmPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [symbolInput, setSymbolInput] = useState(`${SYMBOL_CATALOG[0].displayNameTr} (${SYMBOL_CATALOG[0].symbol})`);
   const [symbol, setSymbol] = useState(SYMBOL_CATALOG[0].symbol);
   const [direction, setDirection] = useState<'above' | 'below'>('above');
   const [targetPrice, setTargetPrice] = useState('');
@@ -40,32 +42,52 @@ export default function AlarmPage() {
 
   return (
     <div className="pb-4">
-      <header className="px-3 pt-4">
-        <h1 className="text-lg font-bold">Alarm</h1>
-        <p className="text-xs text-slate-500">
-          Alarmlar arka planda 15 saniyede bir kontrol edilir. Telegram bildirimi için Ayarlar&apos;dan bot token
-          tanımlayın.
-        </p>
+      <header className="px-3 pt-4 flex items-center gap-2">
+        <Bell size={18} className="text-emerald-400" />
+        <div>
+          <h1 className="text-lg font-bold">Alarm</h1>
+          <p className="text-xs text-slate-500">
+            Alarmlar arka planda 15 saniyede bir kontrol edilir. Telegram bildirimi için Ayarlar&apos;dan bot token
+            tanımlayın.
+          </p>
+        </div>
       </header>
 
       <form onSubmit={addAlert} className="mx-3 mt-3 panel p-3 flex flex-col gap-2">
         <div className="text-xs text-slate-400 font-medium">Yeni Alarm</div>
-        <select value={symbol} onChange={(e) => setSymbol(e.target.value)} className="panel px-2 py-2 text-sm">
+        <input
+          list="symbol-options-alarm"
+          value={symbolInput}
+          onChange={(e) => {
+            setSymbolInput(e.target.value);
+            const match = SYMBOL_CATALOG.find((s) => `${s.displayNameTr} (${s.symbol})` === e.target.value);
+            if (match) setSymbol(match.symbol);
+          }}
+          placeholder="Sembol ara..."
+          className="panel px-2 py-2 text-sm outline-none"
+        />
+        <datalist id="symbol-options-alarm">
           {SYMBOL_CATALOG.map((s) => (
-            <option key={s.symbol} value={s.symbol}>
-              {s.displayNameTr} ({s.symbol})
-            </option>
+            <option key={s.symbol} value={`${s.displayNameTr} (${s.symbol})`} />
           ))}
-        </select>
+        </datalist>
         <div className="flex gap-2">
-          <select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as 'above' | 'below')}
-            className="panel px-2 py-2 text-sm"
-          >
-            <option value="above">Üzerine çıkınca</option>
-            <option value="below">Altına inince</option>
-          </select>
+          <div className="flex panel overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setDirection('above')}
+              className={`flex items-center gap-1 px-2 py-2 text-xs ${direction === 'above' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400'}`}
+            >
+              <ArrowUp size={13} /> Üzeri
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirection('below')}
+              className={`flex items-center gap-1 px-2 py-2 text-xs ${direction === 'below' ? 'bg-red-500/20 text-red-300' : 'text-slate-400'}`}
+            >
+              <ArrowDown size={13} /> Altı
+            </button>
+          </div>
           <input
             value={targetPrice}
             onChange={(e) => setTargetPrice(e.target.value)}
@@ -75,8 +97,11 @@ export default function AlarmPage() {
             className="panel px-2 py-2 text-sm flex-1 outline-none"
           />
         </div>
-        <button type="submit" className="bg-emerald-500/20 text-emerald-300 rounded-lg py-2 text-sm">
-          Alarm Oluştur
+        <button
+          type="submit"
+          className="flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 rounded-lg py-2 text-sm"
+        >
+          <Plus size={15} /> Alarm Oluştur
         </button>
       </form>
 
@@ -91,7 +116,8 @@ export default function AlarmPage() {
             <div key={a.id} className="panel p-3 flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">{def?.displayNameTr ?? a.symbol}</div>
-                <div className="text-[11px] text-slate-500">
+                <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                  {a.direction === 'above' ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                   {a.direction === 'above' ? 'Üzeri' : 'Altı'}: {a.targetPrice}
                 </div>
               </div>
@@ -101,8 +127,11 @@ export default function AlarmPage() {
                 ) : (
                   <span className="text-xs text-slate-500">Aktif</span>
                 )}
-                <button onClick={() => removeAlert(a.id)} className="text-[10px] text-slate-500 underline mt-1 block">
-                  Sil
+                <button
+                  onClick={() => removeAlert(a.id)}
+                  className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 mt-1 ml-auto"
+                >
+                  <Trash2 size={11} /> Sil
                 </button>
               </div>
             </div>

@@ -15,6 +15,7 @@ export default function AnasayfaPage() {
       <Section title="Emtia" category="commodity" />
       <Section title="BIST" category="bist" />
       <Section title="ABD Hisseleri" category="us_stock" />
+      <Section title="ETF" category="etf" />
     </div>
   );
 }

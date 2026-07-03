@@ -32,16 +32,51 @@ async function main() {
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-  const clients = new Set<WebSocket>();
+  // Each client tracks the set of symbols it has explicitly asked to
+  // stream (beyond the default priority set), so the hub can ref-count
+  // dynamic tradingview-twc subscriptions and drop them once nobody is
+  // watching that symbol anymore (smart batching / category-based
+  // streaming / watchlist-priority streaming).
+  const clientSubs = new Map<WebSocket, Set<string>>();
   wss.on('connection', (ws) => {
-    clients.add(ws);
+    clientSubs.set(ws, new Set());
     ws.send(JSON.stringify({ type: 'snapshot', quotes: hub.allLatest() }));
-    ws.on('close', () => clients.delete(ws));
+
+    ws.on('message', (raw) => {
+      let msg: { type?: string; symbols?: unknown };
+      try {
+        msg = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+      const symbols = Array.isArray(msg.symbols) ? msg.symbols.filter((s): s is string => typeof s === 'string') : [];
+      if (symbols.length === 0) return;
+      const mine = clientSubs.get(ws);
+      if (!mine) return;
+
+      if (msg.type === 'subscribe') {
+        const fresh = symbols.filter((s) => !mine.has(s));
+        fresh.forEach((s) => mine.add(s));
+        if (fresh.length > 0) hub.subscribeDynamic(fresh);
+        const snapshot = symbols.map((s) => hub.getLatest(s)).filter((q): q is NonNullable<typeof q> => !!q);
+        if (snapshot.length > 0) ws.send(JSON.stringify({ type: 'snapshot', quotes: snapshot }));
+      } else if (msg.type === 'unsubscribe') {
+        const mineToDrop = symbols.filter((s) => mine.has(s));
+        mineToDrop.forEach((s) => mine.delete(s));
+        if (mineToDrop.length > 0) hub.unsubscribeDynamic(mineToDrop);
+      }
+    });
+
+    ws.on('close', () => {
+      const mine = clientSubs.get(ws);
+      if (mine && mine.size > 0) hub.unsubscribeDynamic([...mine]);
+      clientSubs.delete(ws);
+    });
   });
 
   hub.onTick((quote) => {
     const payload = JSON.stringify({ type: 'tick', quote });
-    for (const client of clients) {
+    for (const client of clientSubs.keys()) {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     }
   });
