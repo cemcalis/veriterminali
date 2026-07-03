@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2, Wallet, Plus, PackageOpen, TrendingDown, History, PieChart } from 'lucide-react';
+import { Trash2, Wallet, Plus, PackageOpen, TrendingDown, History, PieChart, Landmark } from 'lucide-react';
 import { api } from '@/lib/api';
 import { CATEGORY_LABELS_TR, SYMBOL_CATALOG } from '@/lib/symbols';
 import { useSymbolSubscription } from '@/lib/use-market-socket';
 import { usePriceFlash } from '@/lib/use-price-flash';
 import { haptic } from '@/lib/telegram';
 import { EquitySparkline } from '@/components/equity-sparkline';
-import type { EquitySnapshot, Position, Trade } from '@/lib/types';
+import type { CorporateActionItem, EquitySnapshot, Position, Trade } from '@/lib/types';
 
 function PositionRow({
   position,
@@ -126,6 +126,7 @@ export default function PortfoyPage() {
   const [loading, setLoading] = useState(true);
   const [equityHistory, setEquityHistory] = useState<EquitySnapshot[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [corporateActions, setCorporateActions] = useState<{ symbol: string; items: CorporateActionItem[] }[]>([]);
 
   useSymbolSubscription(positions.map((p) => p.symbol));
 
@@ -147,6 +148,18 @@ export default function PortfoyPage() {
     const timer = setInterval(refresh, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const bistSymbols = [...new Set(positions.map((p) => p.symbol))].filter((s) => s.startsWith('BIST:'));
+    if (bistSymbols.length === 0) {
+      setCorporateActions([]);
+      return;
+    }
+    api.corporateActions
+      .forHoldings(bistSymbols)
+      .then((res) => setCorporateActions(res.bySymbol))
+      .catch(() => setCorporateActions([]));
+  }, [positions]);
 
   async function sellPosition(sym: string, qty: number) {
     const position = positions.find((p) => p.symbol === sym);
@@ -199,6 +212,24 @@ export default function PortfoyPage() {
         <Wallet size={18} className="text-emerald-400" />
         <h1 className="text-lg font-bold">Portföy</h1>
       </header>
+
+      {corporateActions.length > 0 && (
+        <div className="mx-4 mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-amber-300">
+            <Landmark size={13} /> Kurumsal aksiyon bildirimi
+          </div>
+          {corporateActions.map(({ symbol, items }) => (
+            <div key={symbol} className="text-[11px] text-amber-100/80">
+              <span className="font-mono">{symbol}</span>: {items[0].title}
+              {items.length > 1 ? ` (+${items.length - 1} bildirim daha)` : ''} — maliyet tabanınızı KAP kaydına göre
+              gözden geçirin.{' '}
+              <a href={items[0].url} target="_blank" rel="noopener noreferrer" className="underline">
+                Bildirimi gör
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={`mx-4 mt-3 rounded-2xl p-4 border border-[var(--border)] ${totalPnl >= 0 ? 'gradient-card-green' : 'gradient-card-red'}`}>
         <div className="text-xs text-slate-500">Toplam Değer</div>
