@@ -1,12 +1,17 @@
 import { ProviderRegistry } from '../../src/providers/provider-registry.js';
 import { BinanceProvider } from '../../src/providers/binance.provider.js';
+import { BinanceFuturesProvider } from '../../src/providers/binance-futures.provider.js';
 import { TradingViewTwcProvider } from '../../src/providers/tradingview-twc.provider.js';
 import { YahooProvider } from '../../src/providers/yahoo.provider.js';
 import { FinnhubProvider } from '../../src/providers/finnhub.provider.js';
 import { TwelveDataProvider } from '../../src/providers/twelvedata.provider.js';
 import { SYMBOL_CATALOG, type SymbolDef } from '../../src/symbols.js';
+import { DiscoveredSymbolStore } from '../../src/discovered-symbols.js';
+import { dynamicSymbolLookup } from '../../src/symbol-lookup.js';
 import type { Quote, MarketCategory, DataStatus } from '../../src/providers/market-provider.interface.js';
 import { Cache } from './cache.js';
+import { JsonStore } from './store/json-store.js';
+import { fileURLToPath } from 'node:url';
 
 export type TickListener = (quote: Quote) => void;
 
@@ -22,6 +27,7 @@ const FALLBACK_STALE_AGE_MS = 60_000;
 export class MarketHub {
   readonly registry = new ProviderRegistry();
   private binance = new BinanceProvider();
+  private binanceFutures = new BinanceFuturesProvider();
   private tv = new TradingViewTwcProvider();
   private yahoo = new YahooProvider();
   private finnhub = new FinnhubProvider();
@@ -36,10 +42,18 @@ export class MarketHub {
    * unofficial socket from being asked to track everything at once. */
   private tvRefCounts = new Map<string, number>();
   private prioritySymbols = new Set<string>();
+  // Single stable callback reused for every tv.subscribe() call, so the
+  // provider's listener Set doesn't accumulate a fresh closure (and fire
+  // duplicate ticks) on every dynamic subscribe.
+  private readonly tvTickListener = (quote: Quote) => this.handleTick(quote);
+  readonly discovered = new DiscoveredSymbolStore(
+    new JsonStore(fileURLToPath(new URL('../data/discovered-symbols.json', import.meta.url)), {}),
+  );
 
   constructor(cache: Cache) {
     this.cache = cache;
     this.registry.register(this.binance);
+    this.registry.register(this.binanceFutures);
     this.registry.register(this.tv);
     this.registry.register(this.yahoo);
     this.registry.register(this.finnhub);
@@ -47,13 +61,17 @@ export class MarketHub {
   }
 
   async start(): Promise<void> {
-    await Promise.allSettled([this.binance.connect(), this.tv.connect()]);
+    await Promise.allSettled([this.binance.connect(), this.binanceFutures.connect(), this.tv.connect()]);
 
     const cryptoSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto').map((s) => s.symbol);
     await this.binance.subscribe(cryptoSymbols, (quote) => this.handleTick(quote));
     console.log(`[market-hub] subscribed ${cryptoSymbols.length} crypto symbols via Binance (all, real WS)`);
 
-    const nonCrypto = this.categories().filter((c) => c !== 'crypto');
+    const futuresSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto_futures').map((s) => s.symbol);
+    await this.binanceFutures.subscribe(futuresSymbols, (quote) => this.handleTick(quote));
+    console.log(`[market-hub] subscribed ${futuresSymbols.length} futures symbols via Binance Futures (all, real WS)`);
+
+    const nonCrypto = this.categories().filter((c) => c !== 'crypto' && c !== 'crypto_futures');
     const prioritySymbols: string[] = [];
     for (const category of nonCrypto) {
       const inCategory = SYMBOL_CATALOG.filter((s) => s.category === category).slice(
@@ -63,7 +81,7 @@ export class MarketHub {
       prioritySymbols.push(...inCategory.map((s) => s.symbol));
     }
     prioritySymbols.forEach((s) => this.prioritySymbols.add(s));
-    await this.tv.subscribe(prioritySymbols, (quote) => this.handleTick(quote));
+    await this.tv.subscribe(prioritySymbols, this.tvTickListener);
     prioritySymbols.forEach((s) => this.tvRefCounts.set(s, (this.tvRefCounts.get(s) ?? 0) + 1));
     console.log(
       `[market-hub] subscribed ${prioritySymbols.length} priority symbols via TradingView (experimental); ` +
@@ -77,19 +95,35 @@ export class MarketHub {
    * don't cause duplicate subscribe/unsubscribe churn. */
   subscribeDynamic(symbols: string[]): void {
     const crypto = symbols.filter((s) => this.findDef(s)?.category === 'crypto');
-    const nonCrypto = symbols.filter((s) => this.findDef(s)?.category !== 'crypto');
+    const futures = symbols.filter((s) => this.findDef(s)?.category === 'crypto_futures');
+    const nonStreamed = symbols.filter((s) => {
+      const cat = this.findDef(s)?.category;
+      // Unknown symbols (no catalog/discovered def) are rejected here
+      // rather than forwarded to TradingView - otherwise a client could
+      // subscribe arbitrary strings that unsubscribeDynamic then skips
+      // (it also requires `def`), leaking ref-count entries forever.
+      return cat !== undefined && cat !== 'crypto' && cat !== 'crypto_futures';
+    });
 
-    // crypto is always fully subscribed already; nothing to do there.
-    void crypto;
+    // Catalog crypto/futures are already subscribed at startup;
+    // subscribe() dedupes internally, so this is a no-op for those and
+    // only actually opens a new stream for symbols discovered dynamically
+    // after boot.
+    if (crypto.length > 0) {
+      void this.binance.subscribe(crypto, (quote) => this.handleTick(quote));
+    }
+    if (futures.length > 0) {
+      void this.binanceFutures.subscribe(futures, (quote) => this.handleTick(quote));
+    }
 
     const toSubscribe: string[] = [];
-    for (const symbol of nonCrypto) {
+    for (const symbol of nonStreamed) {
       const count = this.tvRefCounts.get(symbol) ?? 0;
       this.tvRefCounts.set(symbol, count + 1);
       if (count === 0) toSubscribe.push(symbol);
     }
     if (toSubscribe.length > 0) {
-      void this.tv.subscribe(toSubscribe, (quote) => this.handleTick(quote));
+      void this.tv.subscribe(toSubscribe, this.tvTickListener);
     }
   }
 
@@ -99,7 +133,7 @@ export class MarketHub {
     const toUnsubscribe: string[] = [];
     for (const symbol of symbols) {
       const def = this.findDef(symbol);
-      if (!def || def.category === 'crypto') continue;
+      if (!def || def.category === 'crypto' || def.category === 'crypto_futures') continue;
       const count = this.tvRefCounts.get(symbol) ?? 0;
       const next = Math.max(0, count - 1);
       this.tvRefCounts.set(symbol, next);
@@ -110,14 +144,44 @@ export class MarketHub {
     }
   }
 
-  private findDef(symbol: string): SymbolDef | undefined {
-    return SYMBOL_CATALOG.find((s) => s.symbol === symbol);
+  /** Looks up a symbol in the static catalog first, then in previously
+   * discovered (dynamically found) symbols. */
+  findDef(symbol: string): SymbolDef | undefined {
+    return SYMBOL_CATALOG.find((s) => s.symbol === symbol) ?? this.discovered.find(symbol);
+  }
+
+  /** Full browsable catalog: the static generated list plus anything
+   * discovered so far via dynamic search, so a discovered symbol shows
+   * up in normal category browsing right away. */
+  fullCatalog(): SymbolDef[] {
+    return [...SYMBOL_CATALOG, ...this.discovered.all()];
+  }
+
+  /** Local substring search across the static catalog + discovered
+   * symbols. */
+  searchLocal(query: string, limit = 20): SymbolDef[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const matches = this.fullCatalog().filter(
+      (s) => s.symbol.toLowerCase().includes(q) || s.displayNameTr.toLowerCase().includes(q),
+    );
+    return matches.slice(0, limit);
+  }
+
+  /** Falls back to live provider lookups (Binance, Yahoo search) when the
+   * local catalog has no match, so the app feels like it can search
+   * unlimited markets. Newly found symbols are persisted and immediately
+   * become fetchable like any catalog symbol. */
+  async searchDynamic(query: string): Promise<SymbolDef[]> {
+    const found = await dynamicSymbolLookup(query);
+    for (const def of found) this.discovered.add(def);
+    return found;
   }
 
   private computeStatus(quote: Quote): DataStatus {
     const age = Date.now() - quote.timestamp;
     if (quote.price === null) return 'unavailable';
-    if (quote.provider === 'binance') return 'live';
+    if (quote.provider === 'binance' || quote.provider === 'binance-futures') return 'live';
     if (quote.delayed) return age > FALLBACK_STALE_AGE_MS ? 'fallback' : 'delayed';
     if (quote.experimental) return age <= NEAR_LIVE_MAX_AGE_MS ? 'near-live' : 'fallback';
     return age <= NEAR_LIVE_MAX_AGE_MS ? 'live' : 'fallback';
@@ -157,6 +221,12 @@ export class MarketHub {
       if (q) return { ...q, status: this.computeStatus(q) };
     }
 
+    if (def.category === 'crypto_futures') {
+      const q = await this.binanceFutures.getQuote(def.symbol).catch(() => null);
+      if (q) return { ...q, status: this.computeStatus(q) };
+      return null;
+    }
+
     const tvQuote = await this.tv.getQuote(def.symbol).catch(() => null);
     if (tvQuote?.price != null) return { ...tvQuote, status: this.computeStatus(tvQuote) };
 
@@ -182,6 +252,6 @@ export class MarketHub {
   }
 
   categories(): MarketCategory[] {
-    return ['crypto', 'forex', 'commodity', 'bist', 'us_stock', 'etf', 'index'];
+    return ['crypto', 'crypto_futures', 'forex', 'commodity', 'bist', 'us_stock', 'etf', 'index'];
   }
 }

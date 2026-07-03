@@ -7,6 +7,12 @@ import type { Quote } from './types';
 const WS_URL = process.env.NEXT_PUBLIC_BACKEND_WS_URL ?? 'ws://localhost:4000';
 
 let socket: WebSocket | null = null;
+// Ref-counted set of symbols the app currently wants streamed, kept alive
+// across reconnects (module scope survives socket churn) so a transient
+// disconnect can resend the full desired set on the new connection instead
+// of relying on mounted hooks to rerun (they don't, since their `key` is
+// unchanged by a reconnect).
+const activeSubscriptions = new Map<string, number>();
 const pendingSubscribe = new Set<string>();
 const pendingUnsubscribe = new Set<string>();
 
@@ -27,7 +33,10 @@ function flushPending() {
  * for the same symbols across mounted components is safe. */
 export function subscribeSymbols(symbols: string[]): void {
   if (symbols.length === 0) return;
-  symbols.forEach((s) => pendingSubscribe.add(s));
+  symbols.forEach((s) => {
+    activeSubscriptions.set(s, (activeSubscriptions.get(s) ?? 0) + 1);
+    pendingSubscribe.add(s);
+  });
   flushPending();
 }
 
@@ -35,7 +44,15 @@ export function subscribeSymbols(symbols: string[]): void {
  * when navigating away from a category/chart). */
 export function unsubscribeSymbols(symbols: string[]): void {
   if (symbols.length === 0) return;
-  symbols.forEach((s) => pendingUnsubscribe.add(s));
+  symbols.forEach((s) => {
+    const next = (activeSubscriptions.get(s) ?? 0) - 1;
+    if (next <= 0) {
+      activeSubscriptions.delete(s);
+      pendingUnsubscribe.add(s);
+    } else {
+      activeSubscriptions.set(s, next);
+    }
+  });
   flushPending();
 }
 
@@ -72,6 +89,13 @@ export function useMarketSocket() {
       ws.onopen = () => {
         retryRef.current = 0;
         setWsStatus('open');
+        // Resend everything currently desired, not just what's pending -
+        // the new backend connection starts with no subscriptions of its
+        // own, and mounted useSymbolSubscription hooks won't rerun just
+        // because the socket reconnected.
+        if (activeSubscriptions.size > 0) {
+          ws.send(JSON.stringify({ type: 'subscribe', symbols: [...activeSubscriptions.keys()] }));
+        }
         flushPending();
       };
 
