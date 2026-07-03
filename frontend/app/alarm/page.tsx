@@ -1,19 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Trash2, Bell, Plus, ArrowUp, ArrowDown, BellOff } from 'lucide-react';
+import { Trash2, Bell, Plus, ArrowUp, ArrowDown, BellOff, Send } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SYMBOL_CATALOG } from '@/lib/symbols';
 import { haptic } from '@/lib/telegram';
-import type { Alert } from '@/lib/types';
+import { useMarketStore } from '@/lib/store';
+import type { Alert, AlertMetric } from '@/lib/types';
+
+const METRIC_LABELS: Record<AlertMetric, string> = { price: 'Fiyat', changePercent: '% Değişim', volume: 'Hacim' };
 
 export default function AlarmPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [symbolInput, setSymbolInput] = useState(`${SYMBOL_CATALOG[0].displayNameTr} (${SYMBOL_CATALOG[0].symbol})`);
   const [symbol, setSymbol] = useState(SYMBOL_CATALOG[0].symbol);
+  const [metric, setMetric] = useState<AlertMetric>('price');
   const [direction, setDirection] = useState<'above' | 'below'>('above');
   const [targetPrice, setTargetPrice] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sendToTelegram, setSendToTelegram] = useState(true);
+  const telegramUser = useMarketStore((s) => s.telegramUser);
 
   async function refresh() {
     const res = await api.alerts.list();
@@ -32,7 +38,8 @@ export default function AlarmPage() {
     const price = Number(targetPrice);
     if (!price) return;
     haptic('success');
-    await api.alerts.add(symbol, direction, price);
+    const chatId = sendToTelegram && telegramUser ? String(telegramUser.id) : undefined;
+    await api.alerts.add(symbol, direction, price, metric, chatId);
     setTargetPrice('');
     await refresh();
   }
@@ -74,6 +81,21 @@ export default function AlarmPage() {
             <option key={s.symbol} value={`${s.displayNameTr} (${s.symbol})`} />
           ))}
         </datalist>
+        <div className="flex panel overflow-hidden">
+          {(Object.keys(METRIC_LABELS) as AlertMetric[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                haptic('select');
+                setMetric(m);
+              }}
+              className={`flex-1 px-2 py-2 text-xs transition-colors ${metric === m ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400'}`}
+            >
+              {METRIC_LABELS[m]}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-2">
           <div className="flex panel overflow-hidden">
             <button
@@ -102,10 +124,21 @@ export default function AlarmPage() {
             onChange={(e) => setTargetPrice(e.target.value)}
             type="number"
             step="any"
-            placeholder="Hedef fiyat"
+            placeholder={metric === 'price' ? 'Hedef fiyat' : metric === 'changePercent' ? 'Hedef % değişim' : 'Hedef hacim'}
             className="panel px-2 py-2 text-sm flex-1 outline-none"
           />
         </div>
+        {telegramUser && (
+          <label className="flex items-center gap-2 text-[11px] text-slate-400 px-1">
+            <input
+              type="checkbox"
+              checked={sendToTelegram}
+              onChange={(e) => setSendToTelegram(e.target.checked)}
+              className="accent-emerald-500"
+            />
+            <Send size={12} /> Tetiklenince Telegram'a bildirim gönder
+          </label>
+        )}
         <button
           type="submit"
           className="flex items-center justify-center gap-1.5 gradient-accent text-black font-medium rounded-xl py-2.5 text-sm active:scale-[0.98] transition-transform"
@@ -130,7 +163,8 @@ export default function AlarmPage() {
                 <div className="text-sm font-medium">{def?.displayNameTr ?? a.symbol}</div>
                 <div className="flex items-center gap-1 text-[11px] text-slate-500">
                   {a.direction === 'above' ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
-                  {a.direction === 'above' ? 'Üzeri' : 'Altı'}: {a.targetPrice}
+                  {METRIC_LABELS[a.metric ?? 'price']} {a.direction === 'above' ? 'üzeri' : 'altı'}: {a.targetPrice}
+                  {a.telegramChatId && <Send size={10} className="ml-1 text-sky-400" />}
                 </div>
               </div>
               <div className="text-right">
