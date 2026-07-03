@@ -101,8 +101,9 @@ async function main() {
 
   // alert-checking loop every 15s
   setInterval(() => {
-    void checkAlerts(async (alert, price) => {
-      const msg = `🔔 ${alert.symbol} ${alert.direction === 'above' ? 'yükseldi' : 'düştü'}: ${price} (hedef: ${alert.targetPrice})`;
+    void checkAlerts(async (alert, observed) => {
+      const metricLabel = alert.metric === 'changePercent' ? '% değişim' : alert.metric === 'volume' ? 'hacim' : 'fiyat';
+      const msg = `🔔 ${alert.symbol} ${metricLabel} ${alert.direction === 'above' ? 'üzerine çıktı' : 'altına indi'}: ${observed} (hedef: ${alert.targetPrice})`;
       console.log('[alert]', msg);
       if (alert.telegramChatId) await sendTelegramMessage(alert.telegramChatId, msg);
     });

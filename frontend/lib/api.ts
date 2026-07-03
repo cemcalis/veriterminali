@@ -1,6 +1,7 @@
 import type {
   AiAnswer,
   Alert,
+  AlertMetric,
   Candle,
   CandleInterval,
   CorporateActionItem,
@@ -59,10 +60,16 @@ export const api = {
   },
   alerts: {
     list: () => json<{ alerts: Alert[] }>('/api/alerts'),
-    add: (symbol: string, direction: 'above' | 'below', targetPrice: number) =>
+    add: (
+      symbol: string,
+      direction: 'above' | 'below',
+      targetPrice: number,
+      metric: AlertMetric = 'price',
+      telegramChatId?: string,
+    ) =>
       json<{ alerts: Alert[] }>('/api/alerts', {
         method: 'POST',
-        body: JSON.stringify({ symbol, direction, targetPrice }),
+        body: JSON.stringify({ symbol, direction, targetPrice, metric, telegramChatId }),
       }),
     remove: (id: string) => json<{ alerts: Alert[] }>(`/api/alerts/${id}`, { method: 'DELETE' }),
   },

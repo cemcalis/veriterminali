@@ -85,13 +85,17 @@ export interface EquitySnapshot {
   totalValue: number;
 }
 
+export type AlertMetric = 'price' | 'changePercent' | 'volume';
+
 export interface Alert {
   id: string;
   symbol: string;
+  metric: AlertMetric;
   direction: 'above' | 'below';
   targetPrice: number;
   createdAt: number;
   triggeredAt: number | null;
+  telegramChatId?: string;
 }
 
 export interface WatchlistItem {
