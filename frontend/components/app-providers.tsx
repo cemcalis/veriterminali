@@ -10,6 +10,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     initTelegram();
     useMarketStore.getState().hydrateFromStorage();
+    void useMarketStore.getState().syncWatchlistFromServer();
   }, []);
   return <>{children}</>;
 }

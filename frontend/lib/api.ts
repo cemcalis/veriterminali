@@ -1,4 +1,4 @@
-import type { Alert, Candle, CandleInterval, Position, ProviderHealth, Quote } from './types';
+import type { Alert, Candle, CandleInterval, Position, ProviderHealth, Quote, SymbolDef, WatchlistItem } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_HTTP_URL ?? 'http://localhost:4000';
 
@@ -15,6 +15,8 @@ export const api = {
   status: () => json<{ ok: boolean; cacheBackend: string; time: number }>('/api/status'),
   health: () => json<{ providers: ProviderHealth[] }>('/api/market/health'),
   quote: (symbol: string) => json<{ quote: Quote }>(`/api/market/quote/${encodeURIComponent(symbol)}`),
+  search: (query: string) =>
+    json<{ results: SymbolDef[]; discovered: boolean }>(`/api/market/search?q=${encodeURIComponent(query)}`),
   candles: (symbol: string, interval: CandleInterval) =>
     json<{ candles: Candle[]; provider: string; experimental: boolean }>(
       `/api/market/candles/${encodeURIComponent(symbol)}?interval=${interval}`,
@@ -36,5 +38,12 @@ export const api = {
         body: JSON.stringify({ symbol, direction, targetPrice }),
       }),
     remove: (id: string) => json<{ alerts: Alert[] }>(`/api/alerts/${id}`, { method: 'DELETE' }),
+  },
+  watchlist: {
+    list: () => json<{ items: WatchlistItem[] }>('/api/watchlist'),
+    add: (symbol: string) =>
+      json<{ items: WatchlistItem[] }>('/api/watchlist', { method: 'POST', body: JSON.stringify({ symbol }) }),
+    remove: (symbol: string) =>
+      json<{ items: WatchlistItem[] }>(`/api/watchlist/${encodeURIComponent(symbol)}`, { method: 'DELETE' }),
   },
 };
