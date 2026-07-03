@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, Bell, Wallet, Settings2, Radar, CalendarDays } from 'lucide-react';
+import { Search, Bell, Wallet, Settings2, Radar, CalendarDays, Sparkles } from 'lucide-react';
 import { haptic } from '@/lib/telegram';
 
 const ACTIONS = [
@@ -10,6 +10,7 @@ const ACTIONS = [
   { href: '/piyasalar', label: 'Piyasalar', icon: Search },
   { href: '/portfoy', label: 'Portföy', icon: Wallet },
   { href: '/takvim', label: 'Takvim', icon: CalendarDays },
+  { href: '/asistan', label: 'Asistan', icon: Sparkles },
   { href: '/alarm', label: 'Alarm Kur', icon: Bell },
   { href: '/ayarlar', label: 'Ayarlar', icon: Settings2 },
 ];
