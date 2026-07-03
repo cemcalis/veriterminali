@@ -69,6 +69,22 @@ export interface Position {
   pnlPercent: number | null;
 }
 
+export interface Trade {
+  id: string;
+  symbol: string;
+  side: 'sell';
+  quantity: number;
+  costBasis: number;
+  proceeds: number;
+  realizedPnl: number;
+  closedAt: number;
+}
+
+export interface EquitySnapshot {
+  date: string;
+  totalValue: number;
+}
+
 export interface Alert {
   id: string;
   symbol: string;

@@ -1,43 +1,118 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Trash2, Wallet, Plus, PackageOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Trash2, Wallet, Plus, PackageOpen, TrendingDown, History, PieChart } from 'lucide-react';
 import { api } from '@/lib/api';
-import { SYMBOL_CATALOG } from '@/lib/symbols';
+import { CATEGORY_LABELS_TR, SYMBOL_CATALOG } from '@/lib/symbols';
 import { useSymbolSubscription } from '@/lib/use-market-socket';
 import { usePriceFlash } from '@/lib/use-price-flash';
 import { haptic } from '@/lib/telegram';
-import type { Position } from '@/lib/types';
+import { EquitySparkline } from '@/components/equity-sparkline';
+import type { EquitySnapshot, Position, Trade } from '@/lib/types';
 
-function PositionRow({ position, onRemove }: { position: Position; onRemove: (id: string) => void }) {
+function PositionRow({
+  position,
+  onRemove,
+  onSell,
+}: {
+  position: Position;
+  onRemove: (id: string) => void;
+  onSell: (symbol: string, quantity: number) => void;
+}) {
   const def = SYMBOL_CATALOG.find((s) => s.symbol === position.symbol);
   const flashClass = usePriceFlash(position.currentPrice);
+  const [selling, setSelling] = useState(false);
+
   return (
-    <div className="panel-elevated p-3 flex items-center justify-between">
-      <div>
-        <div className="text-sm font-medium">{def?.displayNameTr ?? position.symbol}</div>
-        <div className="text-[11px] text-slate-500">
-          {position.quantity} adet @ {position.avgCost}
+    <div className="panel-elevated p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-medium">{def?.displayNameTr ?? position.symbol}</div>
+          <div className="text-[11px] text-slate-500">
+            {position.quantity} adet @ {position.avgCost}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`font-mono text-sm px-1 rounded ${flashClass}`}>{position.currentPrice ?? '—'}</div>
+          {position.pnl !== null && (
+            <div className={`text-xs font-mono ${position.pnl >= 0 ? 'price-up' : 'price-down'}`}>
+              {position.pnl >= 0 ? '+' : ''}
+              {position.pnl.toFixed(2)} ({position.pnlPercent?.toFixed(2)}%)
+            </div>
+          )}
+          <div className="flex items-center gap-2 mt-1 justify-end">
+            <button
+              onClick={() => setSelling((s) => !s)}
+              className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-amber-400"
+            >
+              <TrendingDown size={11} /> Sat
+            </button>
+            <button
+              onClick={() => {
+                haptic('warning');
+                onRemove(position.id);
+              }}
+              className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400"
+            >
+              <Trash2 size={11} /> Sil
+            </button>
+          </div>
         </div>
       </div>
-      <div className="text-right">
-        <div className={`font-mono text-sm px-1 rounded ${flashClass}`}>{position.currentPrice ?? '—'}</div>
-        {position.pnl !== null && (
-          <div className={`text-xs font-mono ${position.pnl >= 0 ? 'price-up' : 'price-down'}`}>
-            {position.pnl >= 0 ? '+' : ''}
-            {position.pnl.toFixed(2)} ({position.pnlPercent?.toFixed(2)}%)
-          </div>
-        )}
-        <button
-          onClick={() => {
-            haptic('warning');
-            onRemove(position.id);
+      {selling && (
+        <SellForm
+          max={position.quantity}
+          defaultPrice={position.currentPrice ?? position.avgCost}
+          onCancel={() => setSelling(false)}
+          onConfirm={(qty) => {
+            onSell(position.symbol, qty);
+            setSelling(false);
           }}
-          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 mt-1 ml-auto"
-        >
-          <Trash2 size={11} /> Sil
-        </button>
-      </div>
+        />
+      )}
+    </div>
+  );
+}
+
+function SellForm({
+  max,
+  defaultPrice,
+  onCancel,
+  onConfirm,
+}: {
+  max: number;
+  defaultPrice: number;
+  onCancel: () => void;
+  onConfirm: (quantity: number) => void;
+}) {
+  const [qty, setQty] = useState(String(max));
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-[var(--border)] flex items-center gap-2">
+      <input
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+        type="number"
+        step="any"
+        max={max}
+        className="panel px-2 py-1.5 text-xs flex-1 outline-none"
+        placeholder="Miktar"
+      />
+      <span className="text-[10px] text-slate-500">@ {defaultPrice}</span>
+      <button
+        onClick={() => {
+          const n = Number(qty);
+          if (n > 0 && n <= max) {
+            haptic('success');
+            onConfirm(n);
+          }
+        }}
+        className="text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30"
+      >
+        Onayla
+      </button>
+      <button onClick={onCancel} className="text-[11px] text-slate-500 px-1">
+        İptal
+      </button>
     </div>
   );
 }
@@ -49,6 +124,8 @@ export default function PortfoyPage() {
   const [quantity, setQuantity] = useState('');
   const [avgCost, setAvgCost] = useState('');
   const [loading, setLoading] = useState(true);
+  const [equityHistory, setEquityHistory] = useState<EquitySnapshot[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
 
   useSymbolSubscription(positions.map((p) => p.symbol));
 
@@ -58,11 +135,40 @@ export default function PortfoyPage() {
     setLoading(false);
   }
 
+  async function refreshHistory() {
+    const [{ history }, { trades }] = await Promise.all([api.portfolio.equityHistory(), api.portfolio.trades()]);
+    setEquityHistory(history);
+    setTrades(trades.slice().reverse());
+  }
+
   useEffect(() => {
     refresh();
+    refreshHistory();
     const timer = setInterval(refresh, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  async function sellPosition(sym: string, qty: number) {
+    const position = positions.find((p) => p.symbol === sym);
+    const price = position?.currentPrice ?? position?.avgCost ?? 0;
+    await api.portfolio.sell(sym, qty, price);
+    await refresh();
+    await refreshHistory();
+  }
+
+  const allocation = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    for (const p of positions) {
+      const def = SYMBOL_CATALOG.find((s) => s.symbol === p.symbol);
+      const cat = def?.category ?? 'other';
+      const value = (p.marketValue ?? p.costBasis) || 0;
+      byCategory.set(cat, (byCategory.get(cat) ?? 0) + value);
+    }
+    const total = [...byCategory.values()].reduce((a, b) => a + b, 0);
+    return [...byCategory.entries()]
+      .map(([category, value]) => ({ category, value, percent: total > 0 ? (value / total) * 100 : 0 }))
+      .sort((a, b) => b.value - a.value);
+  }, [positions]);
 
   async function addPosition(e: React.FormEvent) {
     e.preventDefault();
@@ -159,9 +265,66 @@ export default function PortfoyPage() {
           </div>
         )}
         {positions.map((p) => (
-          <PositionRow key={p.id} position={p} onRemove={removePosition} />
+          <PositionRow key={p.id} position={p} onRemove={removePosition} onSell={sellPosition} />
         ))}
       </div>
+
+      {equityHistory.length > 1 && (
+        <div className="mx-4 mt-4 panel-elevated p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <History size={13} /> Performans
+          </div>
+          <EquitySparkline history={equityHistory} />
+        </div>
+      )}
+
+      {allocation.length > 0 && (
+        <div className="mx-4 mt-4 panel-elevated p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <PieChart size={13} /> Dağılım
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {allocation.map((a) => (
+              <div key={a.category} className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 w-24 shrink-0 truncate">
+                  {CATEGORY_LABELS_TR[a.category] ?? a.category}
+                </span>
+                <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div className="h-full gradient-accent" style={{ width: `${a.percent}%` }} />
+                </div>
+                <span className="text-[10px] font-mono text-slate-500 w-10 text-right">{a.percent.toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {trades.length > 0 && (
+        <div className="mx-4 mt-4">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            İşlem Günlüğü
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {trades.slice(0, 20).map((t) => {
+              const def = SYMBOL_CATALOG.find((s) => s.symbol === t.symbol);
+              return (
+                <div key={t.id} className="panel-elevated p-2.5 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-medium">{def?.displayNameTr ?? t.symbol}</div>
+                    <div className="text-[10px] text-slate-500">
+                      {t.quantity} adet satıldı · {new Date(t.closedAt).toLocaleDateString('tr-TR')}
+                    </div>
+                  </div>
+                  <div className={`text-xs font-mono ${t.realizedPnl >= 0 ? 'price-up' : 'price-down'}`}>
+                    {t.realizedPnl >= 0 ? '+' : ''}
+                    {t.realizedPnl.toFixed(2)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
