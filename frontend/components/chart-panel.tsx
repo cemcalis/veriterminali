@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CandlestickSeries, type IChartApi, type ISeriesApi } from 'lightweight-charts';
 import { api } from '@/lib/api';
+import { useMarketStore } from '@/lib/store';
 import type { CandleInterval } from '@/lib/types';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -15,6 +16,7 @@ export function ChartPanel({ symbol }: { symbol: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ provider: string; experimental: boolean } | null>(null);
+  const debugMode = useMarketStore((s) => s.debugMode);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -86,7 +88,7 @@ export function ChartPanel({ symbol }: { symbol: string }) {
             </button>
           ))}
         </div>
-        {meta && (
+        {debugMode && meta && (
           <span className="text-[10px] text-slate-500">
             {meta.provider}
             {meta.experimental ? ' · deneysel' : ''}

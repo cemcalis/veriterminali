@@ -99,8 +99,8 @@ function Row({ index, style, items, mode }: RowComponentProps<RowProps>) {
         )}
 
         <div className="w-[14%] shrink-0 flex flex-col items-end gap-0.5">
-          <StatusBadge status={quote?.status} compact />
-          {(mode === 'detailed' || debugMode) && (
+          <StatusBadge status={quote?.status} />
+          {debugMode && (
             <span className="text-[9px] text-slate-600">
               {quote?.provider ?? '—'} · {formatAge(quote?.timestamp)}
             </span>

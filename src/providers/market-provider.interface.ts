@@ -1,5 +1,6 @@
 export type MarketCategory =
   | 'crypto'
+  | 'crypto_futures'
   | 'forex'
   | 'commodity'
   | 'bist'
