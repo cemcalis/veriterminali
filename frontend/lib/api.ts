@@ -2,6 +2,7 @@ import type {
   Alert,
   Candle,
   CandleInterval,
+  CorporateActionItem,
   EarningsEvent,
   EquitySnapshot,
   MacroEvent,
@@ -88,6 +89,14 @@ export const api = {
         body: JSON.stringify({ name, filters }),
       }),
     remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
+  },
+  corporateActions: {
+    forSymbol: (symbol: string) =>
+      json<{ items: CorporateActionItem[] }>(`/api/corporate-actions/${encodeURIComponent(symbol)}`),
+    forHoldings: (symbols: string[]) =>
+      json<{ bySymbol: { symbol: string; items: CorporateActionItem[] }[] }>(
+        `/api/corporate-actions?symbols=${encodeURIComponent(symbols.join(','))}`,
+      ),
   },
   calendar: {
     economic: (from?: string, to?: string) => {
