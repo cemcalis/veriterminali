@@ -2,6 +2,7 @@ import type {
   Alert,
   Candle,
   CandleInterval,
+  EquitySnapshot,
   InstitutionalResult,
   Position,
   ProviderHealth,
@@ -10,6 +11,7 @@ import type {
   ScannerPreset,
   ScannerRow,
   SymbolDef,
+  Trade,
   WatchlistItem,
 } from './types';
 
@@ -42,6 +44,13 @@ export const api = {
         body: JSON.stringify({ symbol, quantity, avgCost }),
       }),
     remove: (id: string) => json<{ positions: Position[] }>(`/api/portfolio/${id}`, { method: 'DELETE' }),
+    sell: (symbol: string, quantity: number, price: number) =>
+      json<{ positions: Position[]; trades: Trade[] }>('/api/portfolio/sell', {
+        method: 'POST',
+        body: JSON.stringify({ symbol, quantity, price }),
+      }),
+    trades: () => json<{ trades: Trade[] }>('/api/portfolio/trades'),
+    equityHistory: () => json<{ history: EquitySnapshot[] }>('/api/portfolio/equity-history'),
   },
   alerts: {
     list: () => json<{ alerts: Alert[] }>('/api/alerts'),
