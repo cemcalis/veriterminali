@@ -4,9 +4,22 @@
   --background: #0a0a0f;
   --foreground: #e8eaf0;
   --panel: #12121a;
+  --panel-2: #16161f;
   --border: #23232f;
   --accent: #22c55e;
+  --accent-2: #10b981;
   --danger: #ef4444;
+  --amber: #f59e0b;
+
+  /* Telegram-provided overrides (set at runtime by lib/telegram.ts). */
+  --tg-bg: var(--background);
+  --tg-panel: var(--panel);
+  --tg-text: var(--foreground);
+  --tg-hint: #64748b;
+  --tg-accent: var(--accent);
+  --tg-link: var(--accent);
+  --tg-safe-top: env(safe-area-inset-top, 0px);
+  --tg-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @theme inline {
@@ -36,6 +49,39 @@ body {
   border-radius: 0.75rem;
 }
 
+.panel-elevated {
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+.glass {
+  background: rgba(18, 18, 26, 0.72);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, #22c55e 0%, #0891b2 100%);
+}
+
+.gradient-card-green {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.16) 0%, rgba(16, 185, 129, 0.04) 100%);
+}
+
+.gradient-card-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(239, 68, 68, 0.03) 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #34d399 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .price-up {
   color: var(--accent);
 }
@@ -56,7 +102,44 @@ body {
   50% { opacity: 0.7; }
 }
 .skeleton {
-  background: var(--border);
-  border-radius: 0.375rem;
+  background: linear-gradient(90deg, var(--border) 0%, #2c2c3a 50%, var(--border) 100%);
+  background-size: 200% 100%;
+  border-radius: 0.5rem;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes flash-green {
+  0% { background-color: rgba(34, 197, 94, 0.35); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.35); }
+  100% { background-color: transparent; }
+}
+.flash-up {
+  animation: flash-green 0.7s ease-out;
+  border-radius: 0.375rem;
+}
+.flash-down {
+  animation: flash-red 0.7s ease-out;
+  border-radius: 0.375rem;
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), var(--tg-safe-top, 0px));
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px));
+}
+
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: shimmer-sweep 2s infinite;
 }

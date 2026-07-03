@@ -16,7 +16,7 @@ export function Section({ title, category }: { title: string; category: MarketCa
   if (all.length === 0) return null;
 
   return (
-    <section className="px-3 pt-4">
+    <section className="px-4 pt-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
           {title} <span className="text-slate-600 normal-case">({all.length})</span>

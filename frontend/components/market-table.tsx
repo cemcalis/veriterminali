@@ -2,8 +2,10 @@
 
 import { List, type RowComponentProps } from 'react-window';
 import Link from 'next/link';
-import { Star } from 'lucide-react';
+import { Star, SearchX } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
+import { usePriceFlash } from '@/lib/use-price-flash';
+import { haptic } from '@/lib/telegram';
 import type { SymbolDef } from '@/lib/types';
 import { StatusBadge } from './status-badge';
 
@@ -48,18 +50,20 @@ function Row({ index, style, items, mode }: RowComponentProps<RowProps>) {
 
   const chp = quote?.changePercent ?? null;
   const isUp = chp !== null && chp >= 0;
+  const flashClass = usePriceFlash(quote?.price ?? null);
 
   return (
     <div
       style={style}
-      className="flex items-center gap-2 px-3 border-b border-[var(--border)]/50 hover:bg-white/[0.02]"
+      className="flex items-center gap-2 px-4 border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors"
     >
       <button
         onClick={(e) => {
           e.preventDefault();
+          haptic('select');
           toggleWatch(def.symbol);
         }}
-        className="shrink-0 text-slate-500 hover:text-amber-400 transition-colors"
+        className="shrink-0 text-slate-500 hover:text-amber-400 transition-colors active:scale-90"
         aria-label="favorilere ekle"
       >
         <Star size={15} fill={watched ? 'currentColor' : 'none'} className={watched ? 'text-amber-400' : ''} />
@@ -71,7 +75,9 @@ function Row({ index, style, items, mode }: RowComponentProps<RowProps>) {
           <div className="text-[10px] text-slate-500 truncate">{def.symbol}</div>
         </div>
 
-        <div className="text-right font-mono text-sm w-[20%] shrink-0">{formatPrice(quote?.price ?? null)}</div>
+        <div className={`text-right font-mono text-sm w-[20%] shrink-0 px-1 ${flashClass}`}>
+          {formatPrice(quote?.price ?? null)}
+        </div>
 
         <div
           className={`text-right font-mono text-xs w-[16%] shrink-0 ${
@@ -109,12 +115,17 @@ export function MarketTable({ items, mode }: { items: SymbolDef[]; mode: TableMo
   const rowHeight = mode === 'detailed' ? 56 : 44;
 
   if (items.length === 0) {
-    return <div className="py-10 text-center text-sm text-slate-500">Sonuç bulunamadı</div>;
+    return (
+      <div className="py-14 flex flex-col items-center gap-2 text-slate-500">
+        <SearchX size={28} strokeWidth={1.5} />
+        <span className="text-sm">Sonuç bulunamadı</span>
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-2 px-3 pb-1.5 text-[10px] text-slate-500 uppercase tracking-wide">
+      <div className="flex items-center gap-2 px-4 pb-1.5 text-[10px] text-slate-500 uppercase tracking-wide">
         <span className="w-[15px]" />
         <span className="flex-1 min-w-0">Sembol</span>
       </div>

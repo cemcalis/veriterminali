@@ -7,6 +7,7 @@ import { SYMBOL_CATALOG, CATEGORY_LABELS_TR } from '@/lib/symbols';
 import { useMarketStore } from '@/lib/store';
 import { useSymbolSubscription } from '@/lib/use-market-socket';
 import { MarketTable, type TableMode } from '@/components/market-table';
+import { haptic } from '@/lib/telegram';
 import type { MarketCategory } from '@/lib/types';
 
 const CATEGORIES: (MarketCategory | 'watchlist' | 'all')[] = [
@@ -62,22 +63,28 @@ export function PiyasalarContent() {
 
   return (
     <div className="pb-4">
-      <header className="px-3 pt-4 flex items-center justify-between">
+      <header className="px-4 pt-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold">Piyasalar</h1>
           <p className="text-[11px] text-slate-500">{SYMBOL_CATALOG.length} enstrüman</p>
         </div>
-        <div className="flex items-center gap-1 panel p-0.5">
+        <div className="flex items-center gap-1 panel-elevated p-1">
           <button
-            onClick={() => setMode('compact')}
-            className={`p-1.5 rounded-md ${mode === 'compact' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-500'}`}
+            onClick={() => {
+              haptic('select');
+              setMode('compact');
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${mode === 'compact' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-500'}`}
             aria-label="kompakt görünüm"
           >
             <Rows3 size={15} />
           </button>
           <button
-            onClick={() => setMode('detailed')}
-            className={`p-1.5 rounded-md ${mode === 'detailed' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-500'}`}
+            onClick={() => {
+              haptic('select');
+              setMode('detailed');
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${mode === 'detailed' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-500'}`}
             aria-label="detaylı görünüm"
           >
             <Table2 size={15} />
@@ -85,22 +92,25 @@ export function PiyasalarContent() {
         </div>
       </header>
 
-      <div className="px-3 pt-3 relative">
-        <Search size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" />
+      <div className="px-4 pt-3 relative">
+        <Search size={15} className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-500" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sembol veya isim ara..."
-          className="w-full panel pl-9 pr-3 py-2 text-sm outline-none placeholder:text-slate-600"
+          className="w-full panel-elevated pl-9 pr-3 py-2.5 text-sm outline-none placeholder:text-slate-600"
         />
       </div>
 
-      <div className="px-3 pt-3 flex gap-2 overflow-x-auto no-scrollbar">
+      <div className="px-4 pt-3 flex gap-2 overflow-x-auto no-scrollbar">
         {CATEGORIES.map((c) => (
           <button
             key={c}
-            onClick={() => setTab(c)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border ${
+            onClick={() => {
+              haptic('select');
+              setTab(c);
+            }}
+            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs border transition-colors ${
               tab === c
                 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                 : 'border-[var(--border)] text-slate-400'
@@ -114,7 +124,7 @@ export function PiyasalarContent() {
 
       <div className="pt-3">
         {loading ? (
-          <div className="px-3 flex flex-col gap-2">
+          <div className="px-4 flex flex-col gap-2">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="skeleton h-11 w-full" />
             ))}
