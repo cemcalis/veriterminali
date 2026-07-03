@@ -29,7 +29,7 @@ export class FinnhubProvider implements MarketProvider {
   readonly name = 'Finnhub (free tier)';
   readonly isRealtime = false; // free tier is polling REST, not true push realtime
   readonly experimental = false;
-  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'crypto'];
+  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'crypto', 'etf'];
 
   private get apiKey(): string | undefined {
     return process.env.FINNHUB_API_KEY;

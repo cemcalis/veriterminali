@@ -1,4 +1,6 @@
-export type MarketCategory = 'crypto' | 'forex' | 'commodity' | 'bist' | 'us_stock' | 'index';
+export type MarketCategory = 'crypto' | 'forex' | 'commodity' | 'bist' | 'us_stock' | 'etf' | 'index';
+
+export type DataStatus = 'live' | 'near-live' | 'delayed' | 'fallback' | 'unavailable';
 
 export interface Quote {
   symbol: string;
@@ -12,6 +14,7 @@ export interface Quote {
   provider: string;
   delayed: boolean;
   experimental: boolean;
+  status?: DataStatus;
 }
 
 export interface Candle {

@@ -5,7 +5,9 @@
   "description": "Provider connectivity testing layer for Veri Terminali",
   "type": "module",
   "scripts": {
-    "test:providers": "tsx scripts/test-providers.ts"
+    "test:providers": "tsx scripts/test-providers.ts",
+    "generate:symbols": "node scripts/generate-symbols.mjs",
+    "generate:coverage": "tsx scripts/generate-coverage-report.ts"
   },
   "dependencies": {
     "ws": "^8.18.0",

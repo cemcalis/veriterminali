@@ -28,6 +28,7 @@ export class TradingViewTwcProvider implements MarketProvider {
     'commodity',
     'bist',
     'us_stock',
+    'etf',
     'index',
   ];
 

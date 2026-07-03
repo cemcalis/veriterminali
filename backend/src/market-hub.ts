@@ -1,26 +1,33 @@
 import { ProviderRegistry } from '../../src/providers/provider-registry.js';
 import { BinanceProvider } from '../../src/providers/binance.provider.js';
+import { BinanceFuturesProvider } from '../../src/providers/binance-futures.provider.js';
 import { TradingViewTwcProvider } from '../../src/providers/tradingview-twc.provider.js';
 import { YahooProvider } from '../../src/providers/yahoo.provider.js';
 import { FinnhubProvider } from '../../src/providers/finnhub.provider.js';
 import { TwelveDataProvider } from '../../src/providers/twelvedata.provider.js';
 import { SYMBOL_CATALOG, type SymbolDef } from '../../src/symbols.js';
-import type { Quote, MarketCategory } from '../../src/providers/market-provider.interface.js';
+import { DiscoveredSymbolStore } from '../../src/discovered-symbols.js';
+import { dynamicSymbolLookup } from '../../src/symbol-lookup.js';
+import type { Quote, MarketCategory, DataStatus } from '../../src/providers/market-provider.interface.js';
 import { Cache } from './cache.js';
+import { JsonStore } from './store/json-store.js';
+import { fileURLToPath } from 'node:url';
 
 export type TickListener = (quote: Quote) => void;
 
-/**
- * Central hub wiring the provider registry to the app's fixed symbol
- * catalog. Routing policy:
- *  - crypto -> binance (official realtime, no key)
- *  - everything else -> tradingview-twc (experimental realtime, no key)
- *  - if a live tick hasn't arrived recently, REST fallback chain kicks
- *    in for polled quote reads: finnhub/twelvedata (if keyed) -> yahoo
- */
+/** How many symbols per non-crypto category are streamed live by default
+ * (most liquid/popular first, since the catalog is ordered that way).
+ * Everything outside this priority set is still fully queryable via REST
+ * (getQuoteWithFallback) and can be promoted to live streaming on demand
+ * via subscribeDynamic (e.g. a client viewing that category/symbol). */
+const DEFAULT_PRIORITY_PER_CATEGORY = 30;
+const NEAR_LIVE_MAX_AGE_MS = 15_000;
+const FALLBACK_STALE_AGE_MS = 60_000;
+
 export class MarketHub {
   readonly registry = new ProviderRegistry();
   private binance = new BinanceProvider();
+  private binanceFutures = new BinanceFuturesProvider();
   private tv = new TradingViewTwcProvider();
   private yahoo = new YahooProvider();
   private finnhub = new FinnhubProvider();
@@ -29,9 +36,24 @@ export class MarketHub {
   private latest = new Map<string, Quote>();
   private cache: Cache;
 
+  /** symbols currently streamed live via tradingview-twc, and how many
+   * distinct interested parties (default-priority + connected clients)
+   * currently want each one. Ref count 0 => unsubscribed to save the
+   * unofficial socket from being asked to track everything at once. */
+  private tvRefCounts = new Map<string, number>();
+  private prioritySymbols = new Set<string>();
+  // Single stable callback reused for every tv.subscribe() call, so the
+  // provider's listener Set doesn't accumulate a fresh closure (and fire
+  // duplicate ticks) on every dynamic subscribe.
+  private readonly tvTickListener = (quote: Quote) => this.handleTick(quote);
+  readonly discovered = new DiscoveredSymbolStore(
+    new JsonStore(fileURLToPath(new URL('../data/discovered-symbols.json', import.meta.url)), {}),
+  );
+
   constructor(cache: Cache) {
     this.cache = cache;
     this.registry.register(this.binance);
+    this.registry.register(this.binanceFutures);
     this.registry.register(this.tv);
     this.registry.register(this.yahoo);
     this.registry.register(this.finnhub);
@@ -39,23 +61,138 @@ export class MarketHub {
   }
 
   async start(): Promise<void> {
-    await Promise.allSettled([this.binance.connect(), this.tv.connect()]);
+    await Promise.allSettled([this.binance.connect(), this.binanceFutures.connect(), this.tv.connect()]);
 
     const cryptoSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto').map((s) => s.symbol);
-    const tvSymbols = SYMBOL_CATALOG.filter((s) => s.category !== 'crypto').map((s) => s.symbol);
-
     await this.binance.subscribe(cryptoSymbols, (quote) => this.handleTick(quote));
-    await this.tv.subscribe(tvSymbols, (quote) => this.handleTick(quote));
+    console.log(`[market-hub] subscribed ${cryptoSymbols.length} crypto symbols via Binance (all, real WS)`);
 
-    console.log(`[market-hub] subscribed ${cryptoSymbols.length} crypto symbols via Binance`);
-    console.log(`[market-hub] subscribed ${tvSymbols.length} symbols via TradingView (experimental)`);
+    const futuresSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto_futures').map((s) => s.symbol);
+    await this.binanceFutures.subscribe(futuresSymbols, (quote) => this.handleTick(quote));
+    console.log(`[market-hub] subscribed ${futuresSymbols.length} futures symbols via Binance Futures (all, real WS)`);
+
+    const nonCrypto = this.categories().filter((c) => c !== 'crypto' && c !== 'crypto_futures');
+    const prioritySymbols: string[] = [];
+    for (const category of nonCrypto) {
+      const inCategory = SYMBOL_CATALOG.filter((s) => s.category === category).slice(
+        0,
+        DEFAULT_PRIORITY_PER_CATEGORY,
+      );
+      prioritySymbols.push(...inCategory.map((s) => s.symbol));
+    }
+    prioritySymbols.forEach((s) => this.prioritySymbols.add(s));
+    await this.tv.subscribe(prioritySymbols, this.tvTickListener);
+    prioritySymbols.forEach((s) => this.tvRefCounts.set(s, (this.tvRefCounts.get(s) ?? 0) + 1));
+    console.log(
+      `[market-hub] subscribed ${prioritySymbols.length} priority symbols via TradingView (experimental); ` +
+        `${SYMBOL_CATALOG.length - cryptoSymbols.length - prioritySymbols.length} more available on-demand / via REST fallback`,
+    );
+  }
+
+  /** Called when a client wants live streaming for symbols outside the
+   * default priority set (e.g. viewing a category page or a watchlist
+   * item). Ref-counted so multiple clients sharing interest in a symbol
+   * don't cause duplicate subscribe/unsubscribe churn. */
+  subscribeDynamic(symbols: string[]): void {
+    const crypto = symbols.filter((s) => this.findDef(s)?.category === 'crypto');
+    const futures = symbols.filter((s) => this.findDef(s)?.category === 'crypto_futures');
+    const nonStreamed = symbols.filter((s) => {
+      const cat = this.findDef(s)?.category;
+      // Unknown symbols (no catalog/discovered def) are rejected here
+      // rather than forwarded to TradingView - otherwise a client could
+      // subscribe arbitrary strings that unsubscribeDynamic then skips
+      // (it also requires `def`), leaking ref-count entries forever.
+      return cat !== undefined && cat !== 'crypto' && cat !== 'crypto_futures';
+    });
+
+    // Catalog crypto/futures are already subscribed at startup;
+    // subscribe() dedupes internally, so this is a no-op for those and
+    // only actually opens a new stream for symbols discovered dynamically
+    // after boot.
+    if (crypto.length > 0) {
+      void this.binance.subscribe(crypto, (quote) => this.handleTick(quote));
+    }
+    if (futures.length > 0) {
+      void this.binanceFutures.subscribe(futures, (quote) => this.handleTick(quote));
+    }
+
+    const toSubscribe: string[] = [];
+    for (const symbol of nonStreamed) {
+      const count = this.tvRefCounts.get(symbol) ?? 0;
+      this.tvRefCounts.set(symbol, count + 1);
+      if (count === 0) toSubscribe.push(symbol);
+    }
+    if (toSubscribe.length > 0) {
+      void this.tv.subscribe(toSubscribe, this.tvTickListener);
+    }
+  }
+
+  /** Releases interest registered via subscribeDynamic. Priority symbols
+   * are never actually dropped from the live socket even at ref count 0. */
+  unsubscribeDynamic(symbols: string[]): void {
+    const toUnsubscribe: string[] = [];
+    for (const symbol of symbols) {
+      const def = this.findDef(symbol);
+      if (!def || def.category === 'crypto' || def.category === 'crypto_futures') continue;
+      const count = this.tvRefCounts.get(symbol) ?? 0;
+      const next = Math.max(0, count - 1);
+      this.tvRefCounts.set(symbol, next);
+      if (next === 0 && !this.prioritySymbols.has(symbol)) toUnsubscribe.push(symbol);
+    }
+    if (toUnsubscribe.length > 0) {
+      void this.tv.unsubscribe(toUnsubscribe);
+    }
+  }
+
+  /** Looks up a symbol in the static catalog first, then in previously
+   * discovered (dynamically found) symbols. */
+  findDef(symbol: string): SymbolDef | undefined {
+    return SYMBOL_CATALOG.find((s) => s.symbol === symbol) ?? this.discovered.find(symbol);
+  }
+
+  /** Full browsable catalog: the static generated list plus anything
+   * discovered so far via dynamic search, so a discovered symbol shows
+   * up in normal category browsing right away. */
+  fullCatalog(): SymbolDef[] {
+    return [...SYMBOL_CATALOG, ...this.discovered.all()];
+  }
+
+  /** Local substring search across the static catalog + discovered
+   * symbols. */
+  searchLocal(query: string, limit = 20): SymbolDef[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const matches = this.fullCatalog().filter(
+      (s) => s.symbol.toLowerCase().includes(q) || s.displayNameTr.toLowerCase().includes(q),
+    );
+    return matches.slice(0, limit);
+  }
+
+  /** Falls back to live provider lookups (Binance, Yahoo search) when the
+   * local catalog has no match, so the app feels like it can search
+   * unlimited markets. Newly found symbols are persisted and immediately
+   * become fetchable like any catalog symbol. */
+  async searchDynamic(query: string): Promise<SymbolDef[]> {
+    const found = await dynamicSymbolLookup(query);
+    for (const def of found) this.discovered.add(def);
+    return found;
+  }
+
+  private computeStatus(quote: Quote): DataStatus {
+    const age = Date.now() - quote.timestamp;
+    if (quote.price === null) return 'unavailable';
+    if (quote.provider === 'binance' || quote.provider === 'binance-futures') return 'live';
+    if (quote.delayed) return age > FALLBACK_STALE_AGE_MS ? 'fallback' : 'delayed';
+    if (quote.experimental) return age <= NEAR_LIVE_MAX_AGE_MS ? 'near-live' : 'fallback';
+    return age <= NEAR_LIVE_MAX_AGE_MS ? 'live' : 'fallback';
   }
 
   private handleTick(quote: Quote): void {
     if (quote.price === null) return;
-    this.latest.set(quote.symbol, quote);
-    void this.cache.set(`quote:${quote.symbol}`, quote, 30);
-    for (const listener of this.listeners) listener(quote);
+    const withStatus = { ...quote, status: this.computeStatus(quote) };
+    this.latest.set(quote.symbol, withStatus);
+    void this.cache.set(`quote:${quote.symbol}`, withStatus, 30);
+    for (const listener of this.listeners) listener(withStatus);
   }
 
   onTick(listener: TickListener): () => void {
@@ -77,27 +214,33 @@ export class MarketHub {
     if (live) return live;
 
     const cached = await this.cache.get<Quote>(`quote:${def.symbol}`);
-    if (cached) return cached;
+    if (cached) return { ...cached, status: this.computeStatus(cached) };
 
     if (def.category === 'crypto') {
       const q = await this.binance.getQuote(def.symbol).catch(() => null);
-      if (q) return q;
+      if (q) return { ...q, status: this.computeStatus(q) };
+    }
+
+    if (def.category === 'crypto_futures') {
+      const q = await this.binanceFutures.getQuote(def.symbol).catch(() => null);
+      if (q) return { ...q, status: this.computeStatus(q) };
+      return null;
     }
 
     const tvQuote = await this.tv.getQuote(def.symbol).catch(() => null);
-    if (tvQuote?.price != null) return tvQuote;
+    if (tvQuote?.price != null) return { ...tvQuote, status: this.computeStatus(tvQuote) };
 
     if (def.category === 'us_stock' || def.category === 'forex' || def.category === 'crypto') {
       const fh = await this.finnhub.getQuote(def.symbol).catch(() => null);
-      if (fh?.price != null) return fh;
+      if (fh?.price != null) return { ...fh, status: this.computeStatus(fh) };
     }
 
     const td = await this.twelvedata.getQuote(def.symbol).catch(() => null);
-    if (td?.price != null) return td;
+    if (td?.price != null) return { ...td, status: this.computeStatus(td) };
 
     if (def.yahooSymbol) {
       const y = await this.yahoo.getQuote(def.yahooSymbol).catch(() => null);
-      if (y?.price != null) return y;
+      if (y?.price != null) return { ...y, status: this.computeStatus(y) };
     }
 
     return null;
@@ -109,6 +252,6 @@ export class MarketHub {
   }
 
   categories(): MarketCategory[] {
-    return ['crypto', 'forex', 'commodity', 'bist', 'us_stock', 'index'];
+    return ['crypto', 'crypto_futures', 'forex', 'commodity', 'bist', 'us_stock', 'etf', 'index'];
   }
 }

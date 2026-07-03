@@ -31,7 +31,7 @@ export class TwelveDataProvider implements MarketProvider {
   readonly name = 'Twelve Data (free tier)';
   readonly isRealtime = false;
   readonly experimental = false;
-  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'commodity', 'crypto', 'index'];
+  readonly categories: MarketCategory[] = ['us_stock', 'forex', 'commodity', 'crypto', 'index', 'etf'];
 
   private get apiKey(): string | undefined {
     return process.env.TWELVEDATA_API_KEY;
