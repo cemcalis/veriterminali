@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { ChartPanel } from '@/components/chart-panel';
 import { StatusBadge } from '@/components/status-badge';
 import { InstitutionalPanel } from '@/components/institutional-panel';
+import { NewsFeed } from '@/components/news-feed';
 
 export function GrafikContent() {
   const searchParams = useSearchParams();
@@ -131,7 +132,8 @@ export function GrafikContent() {
       </div>
 
       {def?.category === 'bist' && (
-        <div className="px-4 pt-4">
+        <div className="px-4 pt-4 flex flex-col gap-5">
+          <NewsFeed symbol={def.symbol} />
           <InstitutionalPanel symbol={def.symbol} />
         </div>
       )}

@@ -4,6 +4,7 @@ import type {
   CandleInterval,
   EquitySnapshot,
   InstitutionalResult,
+  NewsItem,
   Position,
   ProviderHealth,
   Quote,
@@ -85,6 +86,9 @@ export const api = {
         body: JSON.stringify({ name, filters }),
       }),
     remove: (id: string) => json<{ presets: ScannerPreset[] }>(`/api/scanner-presets/${id}`, { method: 'DELETE' }),
+  },
+  news: {
+    forSymbol: (symbol: string) => json<{ items: NewsItem[]; cached: boolean }>(`/api/news/${encodeURIComponent(symbol)}`),
   },
   institutional: {
     depth: (symbol: string) => json<InstitutionalResult<unknown>>(`/api/institutional/depth/${encodeURIComponent(symbol)}`),
