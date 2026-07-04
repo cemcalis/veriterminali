@@ -16,6 +16,7 @@ import { newsRouter } from './routes/news.js';
 import { calendarRouter } from './routes/calendar.js';
 import { corporateActionsRouter } from './routes/corporate-actions.js';
 import { aiRouter } from './routes/ai.js';
+import { providerDiagnosticsRouter } from './routes/provider-diagnostics.js';
 import { sendTelegramMessage } from './telegram.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -42,6 +43,7 @@ async function main() {
   app.use('/api/calendar', calendarRouter());
   app.use('/api/corporate-actions', corporateActionsRouter(hub));
   app.use('/api/ai', aiRouter(hub));
+  app.use('/api/provider-diagnostics', providerDiagnosticsRouter(hub));
   const { router: alertsRoute, checkAlerts } = alertsRouter(hub);
   app.use('/api/alerts', alertsRoute);
 

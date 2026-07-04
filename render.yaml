@@ -22,12 +22,28 @@ services:
         sync: false
       - key: TWELVEDATA_API_KEY
         sync: false
+      - key: FMP_API_KEY
+        sync: false
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false
+      - key: POLYGON_API_KEY
+        sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: BIST_L2_VENDOR
         sync: false
+      - key: ENABLE_STARTUP_STREAMS
+        value: true
+      - key: ENABLE_TRADINGVIEW
+        value: true
+      - key: ENABLE_TRADINGVIEW_STREAMS
+        value: true
+      - key: ENABLE_BINANCE_STREAMS
+        value: true
+      - key: ENABLE_BINANCE_FUTURES_STREAMS
+        value: true
     healthCheckPath: /api/status
 
   - type: web

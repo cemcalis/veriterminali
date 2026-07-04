@@ -22,6 +22,7 @@ const SAMPLE_SIZE_PER_CATEGORY = 10;
 
 const CATEGORY_LABELS: Record<MarketCategory, string> = {
   crypto: 'Crypto',
+  crypto_futures: 'Crypto Futures',
   forex: 'Forex',
   commodity: 'Commodities',
   bist: 'BIST (Turkish equities)',

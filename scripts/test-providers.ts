@@ -8,6 +8,10 @@ import { StockerApiProvider } from '../src/providers/stockerapi.provider.js';
 import { FinnhubProvider } from '../src/providers/finnhub.provider.js';
 import { TwelveDataProvider } from '../src/providers/twelvedata.provider.js';
 import { YahooProvider } from '../src/providers/yahoo.provider.js';
+import { FmpProvider } from '../src/providers/fmp.provider.js';
+import { AlphaVantageProvider } from '../src/providers/alphavantage.provider.js';
+import { PolygonProvider } from '../src/providers/polygon.provider.js';
+import { EcbProvider } from '../src/providers/ecb.provider.js';
 import type { MarketProvider } from '../src/providers/market-provider.interface.js';
 
 const SYMBOLS = {
@@ -198,6 +202,10 @@ async function main() {
     new StockerApiProvider(),
     new FinnhubProvider(),
     new TwelveDataProvider(),
+    new FmpProvider(),
+    new AlphaVantageProvider(),
+    new PolygonProvider(),
+    new EcbProvider(),
     new YahooProvider(),
   ];
 
