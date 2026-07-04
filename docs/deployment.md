@@ -24,11 +24,26 @@ build context'ine dahil etmeniz gerekir.
 
 ### Render
 
+Repo kökünde bir `render.yaml` (Blueprint) bulunuyor — Render'da "New +" →
+"Blueprint" seçip bu repoyu bağlarsanız her iki servis de aşağıdaki
+ayarlarla otomatik oluşturulur. Manuel "New Web Service" ile kuracaksanız:
+
 1. **New Web Service** → repoyu bağlayın.
 2. **Root Directory**: `.` (repo kökü)
-3. **Build Command**: `cd backend && npm install`
+3. **Build Command**: `npm install && cd backend && npm install && npm run build`
+   > **Kritik:** yalnızca `cd backend && npm install` yeterli değildir.
+   > `backend/src/market-hub.ts` gibi dosyalar repo kökündeki
+   > `src/providers/*.ts` dosyalarını import eder, ve o dosyalar `ws` gibi
+   > paketleri **repo kökünün** `node_modules`'ünden çözer (backend'in
+   > kendi `node_modules`'ü değil — Node'un modül çözümlemesi yalnızca
+   > üst dizinlere bakar, kardeş dizinlere değil). Kökte `npm install`
+   > çalıştırılmazsa backend derlemesi/çalıştırması `Cannot find module 'ws'`
+   > gibi hatalarla başarısız olur; yerelde bu görünmez çünkü kökte zaten
+   > `node_modules` bulunur.
 4. **Start Command**: `cd backend && npm run start`
-5. **Environment**: Node
+5. **Environment**: Node (Node.js sürümü için `NODE_VERSION=20.19.0` env
+   değişkeni eklemeniz önerilir — Render'ın varsayılan sürümü yerelinizle
+   eşleşmeyebilir).
 6. Redis için Render'ın "Redis" add-on'unu ekleyip `REDIS_URL`'i otomatik
    bağlayabilirsiniz, ya da boş bırakıp bellek içi önbelleğe düşmesine izin
    verebilirsiniz (tek instance'lık MVP için yeterli).
@@ -37,7 +52,9 @@ build context'ine dahil etmeniz gerekir.
 > özel WS ayarı gerekmez; her iki platform da standart HTTP upgrade
 > mekanizmasını destekler.
 
-## Frontend → Vercel
+## Frontend → Vercel veya Render
+
+### Vercel
 
 1. Vercel'de yeni proje oluşturun, **Root Directory** olarak `frontend/`
    seçin.
@@ -48,6 +65,18 @@ build context'ine dahil etmeniz gerekir.
      (backend HTTPS ise WebSocket de otomatik olarak `wss://` olmalı)
 4. Deploy edin. Vercel önizleme URL'i alırsınız; bunu Telegram BotFather'da
    Mini App URL'i olarak kullanabilirsiniz.
+
+### Render
+
+`render.yaml` içindeki `veriterminali-frontend` servisi frontend'i de
+Render'da barındırabilir (backend'den bağımsız, kendi `node_modules`'ü
+yeterli — repo köküne bağımlılığı yok):
+
+1. **Root Directory**: `frontend`
+2. **Build Command**: `npm install && npm run build`
+3. **Start Command**: `npm run start`
+4. Aynı `NEXT_PUBLIC_BACKEND_HTTP_URL` / `NEXT_PUBLIC_BACKEND_WS_URL`
+   ortam değişkenlerini tanımlayın.
 
 ## CORS
 
