@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: veriterminali-backend
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: .
+    # backend/src/*.ts imports shared code from the repo-root src/ tree
+    # (../../src/providers/...), which depends on the repo root's own
+    # node_modules (ws, dotenv) -- installing only inside backend/ leaves
+    # those unresolved. Install root deps first, then backend's own.
+    buildCommand: npm install && cd backend && npm install && npm run build
+    startCommand: cd backend && npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: PORT
+        value: 4000
+      - key: REDIS_URL
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TWELVEDATA_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BIST_L2_VENDOR
+        sync: false
+    healthCheckPath: /api/status
+
+  - type: web
+    name: veriterminali-frontend
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: NEXT_PUBLIC_BACKEND_HTTP_URL
+        sync: false
+      - key: NEXT_PUBLIC_BACKEND_WS_URL
+        sync: false
