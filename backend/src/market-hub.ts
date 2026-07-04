@@ -60,16 +60,35 @@ export class MarketHub {
     this.registry.register(this.twelvedata);
   }
 
+  /** No single upstream provider's failure to connect/subscribe at
+   * startup may ever take the whole backend down -- each is independent,
+   * and every other data path (REST fallback, other providers) must keep
+   * working regardless of which one is unreachable. Real incident: an
+   * unguarded `await` here on TradingView's subscribe crashed the entire
+   * process on Render (HTTP 451, Cloudflare blocking the shared outbound
+   * IP range) and prevented the HTTP server from ever binding its port. */
+  private async subscribeStartupPriority(label: string, run: () => Promise<void>): Promise<void> {
+    try {
+      await run();
+    } catch (err) {
+      console.error(`[market-hub] ${label} startup subscribe failed (continuing without it):`, err instanceof Error ? err.message : err);
+    }
+  }
+
   async start(): Promise<void> {
     await Promise.allSettled([this.binance.connect(), this.binanceFutures.connect(), this.tv.connect()]);
 
     const cryptoSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto').map((s) => s.symbol);
-    await this.binance.subscribe(cryptoSymbols, (quote) => this.handleTick(quote));
-    console.log(`[market-hub] subscribed ${cryptoSymbols.length} crypto symbols via Binance (all, real WS)`);
+    await this.subscribeStartupPriority('Binance', async () => {
+      await this.binance.subscribe(cryptoSymbols, (quote) => this.handleTick(quote));
+      console.log(`[market-hub] subscribed ${cryptoSymbols.length} crypto symbols via Binance (all, real WS)`);
+    });
 
     const futuresSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'crypto_futures').map((s) => s.symbol);
-    await this.binanceFutures.subscribe(futuresSymbols, (quote) => this.handleTick(quote));
-    console.log(`[market-hub] subscribed ${futuresSymbols.length} futures symbols via Binance Futures (all, real WS)`);
+    await this.subscribeStartupPriority('Binance Futures', async () => {
+      await this.binanceFutures.subscribe(futuresSymbols, (quote) => this.handleTick(quote));
+      console.log(`[market-hub] subscribed ${futuresSymbols.length} futures symbols via Binance Futures (all, real WS)`);
+    });
 
     const nonCrypto = this.categories().filter((c) => c !== 'crypto' && c !== 'crypto_futures');
     const prioritySymbols: string[] = [];
@@ -81,12 +100,37 @@ export class MarketHub {
       prioritySymbols.push(...inCategory.map((s) => s.symbol));
     }
     prioritySymbols.forEach((s) => this.prioritySymbols.add(s));
-    await this.tv.subscribe(prioritySymbols, this.tvTickListener);
-    prioritySymbols.forEach((s) => this.tvRefCounts.set(s, (this.tvRefCounts.get(s) ?? 0) + 1));
-    console.log(
-      `[market-hub] subscribed ${prioritySymbols.length} priority symbols via TradingView (experimental); ` +
-        `${SYMBOL_CATALOG.length - cryptoSymbols.length - prioritySymbols.length} more available on-demand / via REST fallback`,
-    );
+    // TradingView's socket is an unofficial, reverse-engineered endpoint --
+    // it can reject the handshake outright (e.g. HTTP 451 from Cloudflare
+    // blocking a shared cloud-hosting IP range, observed on Render). Non-
+    // crypto symbols still work via the REST fallback chain in
+    // getQuoteWithFallback(), just without live push updates until/unless
+    // TV becomes reachable again.
+    await this.subscribeStartupPriority('TradingView', async () => {
+      await this.tv.subscribe(prioritySymbols, this.tvTickListener);
+      prioritySymbols.forEach((s) => this.tvRefCounts.set(s, (this.tvRefCounts.get(s) ?? 0) + 1));
+      console.log(
+        `[market-hub] subscribed ${prioritySymbols.length} priority symbols via TradingView (experimental); ` +
+          `${SYMBOL_CATALOG.length - cryptoSymbols.length - prioritySymbols.length} more available on-demand / via REST fallback`,
+      );
+    });
+
+    // Finnhub's free tier includes a genuine real-time trade WebSocket
+    // (not a scrape, not IP-blocked the way TradingView's unofficial
+    // socket is) -- a real, legal, no-cost upgrade for the US-listed
+    // symbols it actually covers. Capped well under its ~50-symbol
+    // free-tier connection limit; skipped entirely if no key is set.
+    if (process.env.FINNHUB_API_KEY) {
+      const finnhubSymbols = SYMBOL_CATALOG.filter((s) => s.category === 'us_stock' || s.category === 'etf')
+        .slice(0, 45)
+        .map((s) => s.symbol);
+      await this.subscribeStartupPriority('Finnhub', async () => {
+        await this.finnhub.subscribe(finnhubSymbols, (quote) => this.handleTick(quote));
+        console.log(`[market-hub] subscribed ${finnhubSymbols.length} us_stock/etf symbols via Finnhub (free tier, real WS)`);
+      });
+    } else {
+      console.log('[market-hub] FINNHUB_API_KEY not set -- skipping free real-time Finnhub WS for us_stock/etf');
+    }
   }
 
   /** Called when a client wants live streaming for symbols outside the
@@ -110,10 +154,14 @@ export class MarketHub {
     // only actually opens a new stream for symbols discovered dynamically
     // after boot.
     if (crypto.length > 0) {
-      void this.binance.subscribe(crypto, (quote) => this.handleTick(quote));
+      this.binance.subscribe(crypto, (quote) => this.handleTick(quote)).catch((err) => {
+        console.error('[market-hub] dynamic Binance subscribe failed:', err instanceof Error ? err.message : err);
+      });
     }
     if (futures.length > 0) {
-      void this.binanceFutures.subscribe(futures, (quote) => this.handleTick(quote));
+      this.binanceFutures.subscribe(futures, (quote) => this.handleTick(quote)).catch((err) => {
+        console.error('[market-hub] dynamic Binance Futures subscribe failed:', err instanceof Error ? err.message : err);
+      });
     }
 
     const toSubscribe: string[] = [];
@@ -123,7 +171,13 @@ export class MarketHub {
       if (count === 0) toSubscribe.push(symbol);
     }
     if (toSubscribe.length > 0) {
-      void this.tv.subscribe(toSubscribe, this.tvTickListener);
+      // Same rationale as start(): a rejected promise here must never be
+      // unhandled -- Node terminates the process on an unhandled
+      // rejection by default, which would crash the whole backend every
+      // time a client asks to watch a symbol while TradingView is down.
+      this.tv.subscribe(toSubscribe, this.tvTickListener).catch((err) => {
+        console.error('[market-hub] dynamic TradingView subscribe failed:', err instanceof Error ? err.message : err);
+      });
     }
   }
 

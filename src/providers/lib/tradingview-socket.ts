@@ -50,6 +50,10 @@ class SocketTornDownError extends Error {
  * TCP socket and force-reconnected. */
 const STALE_CONNECTION_MS = 30000;
 const WATCHDOG_INTERVAL_MS = 10000;
+/** After a failed handshake (e.g. HTTP 451 from an IP-level block), don't
+ * retry more often than this -- hammering an endpoint that's actively
+ * rejecting the connection wastes cycles and looks like abuse. */
+const CONNECT_FAILURE_COOLDOWN_MS = 30000;
 
 export class TradingViewSocket {
   private ws: WebSocket | null = null;
@@ -67,9 +71,13 @@ export class TradingViewSocket {
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private reconnecting = false;
   private manuallyClosed = false;
+  private lastConnectFailureAt = 0;
 
   connect(): Promise<void> {
     if (this.connectPromise) return this.connectPromise;
+    if (this.lastConnectFailureAt && Date.now() - this.lastConnectFailureAt < CONNECT_FAILURE_COOLDOWN_MS) {
+      return Promise.reject(new Error('TradingView connect on cooldown after a recent failure'));
+    }
     this.manuallyClosed = false;
     this.quoteSession = randSession('qs');
     this.connectPromise = new Promise((resolve, reject) => {
@@ -81,6 +89,7 @@ export class TradingViewSocket {
       });
 
       const failTimer = setTimeout(() => {
+        this.recordConnectFailure();
         reject(new Error('TradingView WS connect timeout'));
       }, 10000);
 
@@ -107,6 +116,7 @@ export class TradingViewSocket {
       this.ws.on('error', (err) => {
         clearTimeout(failTimer);
         this.connected = false;
+        this.recordConnectFailure();
         reject(err);
       });
 
@@ -117,6 +127,14 @@ export class TradingViewSocket {
       });
     });
     return this.connectPromise;
+  }
+
+  /** Lets the next connect() attempt actually try again (instead of
+   * returning the same rejected promise forever) while still respecting
+   * CONNECT_FAILURE_COOLDOWN_MS so a hard block doesn't get hammered. */
+  private recordConnectFailure(): void {
+    this.lastConnectFailureAt = Date.now();
+    this.connectPromise = null;
   }
 
   async disconnect(): Promise<void> {
