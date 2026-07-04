@@ -12,6 +12,7 @@ import { watchlistRouter } from './routes/watchlist.js';
 import { scannerRouter } from './routes/scanner.js';
 import { scannerPresetsRouter } from './routes/scanner-presets.js';
 import { institutionalRouter } from './routes/institutional.js';
+import { takasbankRouter } from './routes/takasbank.js';
 import { newsRouter } from './routes/news.js';
 import { calendarRouter } from './routes/calendar.js';
 import { corporateActionsRouter } from './routes/corporate-actions.js';
@@ -39,6 +40,7 @@ async function main() {
   app.use('/api/scanner', scannerRouter(hub));
   app.use('/api/scanner-presets', scannerPresetsRouter());
   app.use('/api/institutional', institutionalRouter());
+  app.use('/api/takasbank', takasbankRouter());
   app.use('/api/news', newsRouter());
   app.use('/api/calendar', calendarRouter());
   app.use('/api/corporate-actions', corporateActionsRouter(hub));

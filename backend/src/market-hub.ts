@@ -13,6 +13,7 @@ import { BigparaProvider } from '../../src/providers/bigpara.provider.js';
 import { IsYatirimProvider } from '../../src/providers/isyatirim.provider.js';
 import { TcmbEvdsProvider } from '../../src/providers/tcmb-evds.provider.js';
 import { BiQuoteProvider } from '../../src/providers/biquote.provider.js';
+import { TradingViewScannerProvider, type BistScanRow } from '../../src/providers/tradingview-scanner.provider.js';
 import { providerHealth } from '../../src/providers/provider-health.js';
 import { SYMBOL_CATALOG, type SymbolDef } from '../../src/symbols.js';
 import { DiscoveredSymbolStore } from '../../src/discovered-symbols.js';
@@ -169,6 +170,11 @@ export class MarketHub {
   private isyatirim = new IsYatirimProvider();
   private tcmbEvds = new TcmbEvdsProvider();
   private biquote = new BiQuoteProvider();
+  private tvScanner = new TradingViewScannerProvider();
+  /** Bulk BIST scanner cache -- see getBistScannerRows(). Short TTL: this
+   * powers the "Tarayıcı" table view, not a single-symbol quote path. */
+  private bistScanCache: { rows: BistScanRow[]; fetchedAt: number } | null = null;
+  private readonly BIST_SCAN_TTL_MS = 30_000;
   private listeners = new Set<TickListener>();
   private latest = new Map<string, Quote>();
   private cache: Cache;
@@ -205,6 +211,28 @@ export class MarketHub {
     this.registry.register(this.isyatirim);
     this.registry.register(this.tcmbEvds);
     this.registry.register(this.biquote);
+    this.registry.register(this.tvScanner);
+  }
+
+  /** Bulk BIST scanner/table data via TradingView's public Screener
+   * backend (scanner.tradingview.com) -- a different endpoint from the
+   * per-symbol tradingview-twc quote socket, deliberately never wired
+   * into fallbackChainFor() so it can never displace an official/
+   * reliable per-symbol quote source. Circuit-breaker protected: if
+   * scanner.tradingview.com starts failing (e.g. blocked on Render the
+   * way the WS socket was), providerHealth opens the breaker after 3
+   * consecutive failures and this returns the last good cache (or [])
+   * with zero further network attempts until the 30s cooldown elapses. */
+  async getBistScannerRows(): Promise<BistScanRow[]> {
+    if (this.bistScanCache && Date.now() - this.bistScanCache.fetchedAt < this.BIST_SCAN_TTL_MS) {
+      return this.bistScanCache.rows;
+    }
+    const rows = await providerHealth.attempt('tradingview-scanner', () => this.tvScanner.scanBist());
+    if (rows) {
+      this.bistScanCache = { rows, fetchedAt: Date.now() };
+      return rows;
+    }
+    return this.bistScanCache?.rows ?? [];
   }
 
   /** No single upstream provider's failure to connect/subscribe at

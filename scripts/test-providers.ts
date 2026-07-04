@@ -16,6 +16,7 @@ import { BigparaProvider } from '../src/providers/bigpara.provider.js';
 import { IsYatirimProvider } from '../src/providers/isyatirim.provider.js';
 import { TcmbEvdsProvider } from '../src/providers/tcmb-evds.provider.js';
 import { BiQuoteProvider } from '../src/providers/biquote.provider.js';
+import { TradingViewScannerProvider } from '../src/providers/tradingview-scanner.provider.js';
 import type { MarketProvider } from '../src/providers/market-provider.interface.js';
 
 const SYMBOLS = {
@@ -218,6 +219,7 @@ async function main() {
     new IsYatirimProvider(),
     new TcmbEvdsProvider(),
     new BiQuoteProvider(),
+    new TradingViewScannerProvider(),
     new YahooProvider(),
   ];
 

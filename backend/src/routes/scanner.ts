@@ -37,8 +37,37 @@ export function scannerRouter(hub: MarketHub) {
     const catalog = hub.fullCatalog();
     const byCategory = category ? catalog.filter((s) => s.category === category) : catalog;
 
+    // BIST only: fill any symbol the live in-memory quote cache doesn't
+    // have yet (most of the ~200-symbol catalog, since only a priority
+    // subset streams live) from TradingView's bulk scanner endpoint --
+    // table/scanner data only, never used for single-symbol quote routes.
+    const bistScanMap =
+      category === 'bist'
+        ? new Map((await hub.getBistScannerRows()).map((r) => [r.symbol, r]))
+        : null;
+
     let candidates = byCategory
-      .map((def) => ({ def, quote: hub.getLatest(def.symbol) }))
+      .map((def) => {
+        const live = hub.getLatest(def.symbol);
+        if (live) return { def, quote: live };
+        const scanned = bistScanMap?.get(def.symbol);
+        if (scanned && scanned.price != null) {
+          const quote: Quote = {
+            symbol: def.symbol,
+            price: scanned.price,
+            change: scanned.change,
+            changePercent: scanned.changePercent,
+            volume: scanned.volume,
+            timestamp: Date.now(),
+            provider: 'tradingview-scanner',
+            delayed: false,
+            experimental: true,
+            status: 'near-live',
+          };
+          return { def, quote };
+        }
+        return { def, quote: undefined };
+      })
       .filter((row): row is { def: (typeof byCategory)[number]; quote: Quote } => !!row.quote && row.quote.price !== null);
 
     if (minChangePercent !== undefined) {

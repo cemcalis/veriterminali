@@ -40,6 +40,8 @@ services:
         value: false
       - key: BIQUOTE_REST_URL
         value: https://biquote.io
+      - key: ENABLE_TRADINGVIEW_SCANNER
+        value: true
       - key: ENABLE_STARTUP_STREAMS
         value: true
       - key: ENABLE_TRADINGVIEW
