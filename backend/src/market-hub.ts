@@ -9,6 +9,11 @@ import { FmpProvider } from '../../src/providers/fmp.provider.js';
 import { AlphaVantageProvider } from '../../src/providers/alphavantage.provider.js';
 import { PolygonProvider } from '../../src/providers/polygon.provider.js';
 import { EcbProvider } from '../../src/providers/ecb.provider.js';
+import { BigparaProvider } from '../../src/providers/bigpara.provider.js';
+import { IsYatirimProvider } from '../../src/providers/isyatirim.provider.js';
+import { TcmbEvdsProvider } from '../../src/providers/tcmb-evds.provider.js';
+import { BiQuoteProvider } from '../../src/providers/biquote.provider.js';
+import { TradingViewScannerProvider, type BistScanRow } from '../../src/providers/tradingview-scanner.provider.js';
 import { providerHealth } from '../../src/providers/provider-health.js';
 import { SYMBOL_CATALOG, type SymbolDef } from '../../src/symbols.js';
 import { DiscoveredSymbolStore } from '../../src/discovered-symbols.js';
@@ -161,6 +166,15 @@ export class MarketHub {
   private alphavantage = new AlphaVantageProvider();
   private polygon = new PolygonProvider();
   private ecb = new EcbProvider();
+  private bigpara = new BigparaProvider();
+  private isyatirim = new IsYatirimProvider();
+  private tcmbEvds = new TcmbEvdsProvider();
+  private biquote = new BiQuoteProvider();
+  private tvScanner = new TradingViewScannerProvider();
+  /** Bulk BIST scanner cache -- see getBistScannerRows(). Short TTL: this
+   * powers the "Tarayıcı" table view, not a single-symbol quote path. */
+  private bistScanCache: { rows: BistScanRow[]; fetchedAt: number } | null = null;
+  private readonly BIST_SCAN_TTL_MS = 30_000;
   private listeners = new Set<TickListener>();
   private latest = new Map<string, Quote>();
   private cache: Cache;
@@ -193,6 +207,32 @@ export class MarketHub {
     this.registry.register(this.alphavantage);
     this.registry.register(this.polygon);
     this.registry.register(this.ecb);
+    this.registry.register(this.bigpara);
+    this.registry.register(this.isyatirim);
+    this.registry.register(this.tcmbEvds);
+    this.registry.register(this.biquote);
+    this.registry.register(this.tvScanner);
+  }
+
+  /** Bulk BIST scanner/table data via TradingView's public Screener
+   * backend (scanner.tradingview.com) -- a different endpoint from the
+   * per-symbol tradingview-twc quote socket, deliberately never wired
+   * into fallbackChainFor() so it can never displace an official/
+   * reliable per-symbol quote source. Circuit-breaker protected: if
+   * scanner.tradingview.com starts failing (e.g. blocked on Render the
+   * way the WS socket was), providerHealth opens the breaker after 3
+   * consecutive failures and this returns the last good cache (or [])
+   * with zero further network attempts until the 30s cooldown elapses. */
+  async getBistScannerRows(): Promise<BistScanRow[]> {
+    if (this.bistScanCache && Date.now() - this.bistScanCache.fetchedAt < this.BIST_SCAN_TTL_MS) {
+      return this.bistScanCache.rows;
+    }
+    const rows = await providerHealth.attempt('tradingview-scanner', () => this.tvScanner.scanBist());
+    if (rows) {
+      this.bistScanCache = { rows, fetchedAt: Date.now() };
+      return rows;
+    }
+    return this.bistScanCache?.rows ?? [];
   }
 
   /** No single upstream provider's failure to connect/subscribe at
@@ -494,6 +534,10 @@ export class MarketHub {
     const fmp = { providerId: 'fmp', fetch: () => this.fmp.getQuote(sym) };
     const alphavantage = { providerId: 'alphavantage', fetch: () => this.alphavantage.getQuote(sym) };
     const ecb = { providerId: 'ecb', fetch: () => this.ecb.getQuote(sym) };
+    const tcmbEvds = { providerId: 'tcmb-evds', fetch: () => this.tcmbEvds.getQuote(sym) };
+    const biquote = { providerId: 'biquote', fetch: () => this.biquote.getQuote(sym) };
+    const bigpara = { providerId: 'bigpara', fetch: () => this.bigpara.getQuote(sym) };
+    const isyatirim = { providerId: 'isyatirim', fetch: () => this.isyatirim.getQuote(sym) };
     const tradingview = FLAGS.tradingView ? [{ providerId: 'tradingview-twc', fetch: () => this.tv.getQuote(sym) }] : [];
     const yahoo = def.yahooSymbol ? [{ providerId: 'yahoo', fetch: () => this.yahoo.getQuote(def.yahooSymbol!) }] : [];
 
@@ -506,16 +550,22 @@ export class MarketHub {
       case 'etf':
         return [finnhub, twelvedata, fmp, ...yahoo, ...tradingview, alphavantage];
       case 'forex':
-        return [finnhub, twelvedata, fmp, ...tradingview, ecb, ...yahoo, alphavantage];
+        // biquote/tcmb-evds are both gated (BIQUOTE_ENABLED=false default,
+        // tcmb-evds requires EVDS_API_KEY) so they're harmless no-ops in
+        // the chain until explicitly enabled/configured.
+        return [finnhub, twelvedata, fmp, ...tradingview, ecb, tcmbEvds, biquote, ...yahoo, alphavantage];
       case 'commodity':
         return [twelvedata, finnhub, fmp, ...tradingview, ...yahoo, alphavantage];
       case 'index':
         return [finnhub, twelvedata, fmp, ...tradingview, ...yahoo];
       case 'bist':
         // BIST realtime depth/AKD/takas has no free path at all (see
-        // bist-institutional.provider.ts) -- for last-price quotes,
-        // every legal free source is tried before giving up.
-        return [...tradingview, ...yahoo, twelvedata, fmp];
+        // bist-institutional.provider.ts). For last-price quotes,
+        // bigpara (near-live public frontend snapshot) and isyatirim
+        // (daily public frontend OHLC) are tried right after TradingView
+        // -- both are undocumented-but-unauthenticated endpoints that
+        // work even when TradingView's socket is Render-blocked (451).
+        return [...tradingview, bigpara, isyatirim, ...yahoo, twelvedata, fmp];
       default:
         return [];
     }
@@ -525,6 +575,14 @@ export class MarketHub {
    * its recent candle history. Shared by the /candles REST route and the
    * scanner's on-demand indicator computation. */
   async getCandlesFor(def: SymbolDef, interval: CandleInterval, limit = 200) {
+    if (def.category === 'bist') {
+      // TradingView's unofficial socket is Render-blocked (451); isyatirim
+      // (public, unauthenticated, daily OHLC) is the working fallback.
+      const candles = await this.isyatirim.getCandles(def.symbol, interval, limit);
+      if (candles.length > 0) return { candles, providerId: 'isyatirim' };
+      const tvCandles = await this.tv.getCandles(def.symbol, interval, limit);
+      return { candles: tvCandles, providerId: 'tradingview-twc' };
+    }
     const providerId =
       def.category === 'crypto' ? 'binance' : def.category === 'crypto_futures' ? 'binance-futures' : 'tradingview-twc';
     const provider = this.registry.get(providerId);

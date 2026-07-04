@@ -12,6 +12,11 @@ import { FmpProvider } from '../src/providers/fmp.provider.js';
 import { AlphaVantageProvider } from '../src/providers/alphavantage.provider.js';
 import { PolygonProvider } from '../src/providers/polygon.provider.js';
 import { EcbProvider } from '../src/providers/ecb.provider.js';
+import { BigparaProvider } from '../src/providers/bigpara.provider.js';
+import { IsYatirimProvider } from '../src/providers/isyatirim.provider.js';
+import { TcmbEvdsProvider } from '../src/providers/tcmb-evds.provider.js';
+import { BiQuoteProvider } from '../src/providers/biquote.provider.js';
+import { TradingViewScannerProvider } from '../src/providers/tradingview-scanner.provider.js';
 import type { MarketProvider } from '../src/providers/market-provider.interface.js';
 
 const SYMBOLS = {
@@ -21,6 +26,10 @@ const SYMBOLS = {
   bist: ['BIST:XU100', 'BIST:THYAO', 'BIST:ASELS', 'BIST:KCHOL', 'BIST:SISE'],
   us_stock: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'SPY', 'QQQ'],
 };
+
+// bigpara/isyatirim expect a bare BIST code (no "BIST:" prefix); tcmb-evds
+// expects a plain 6-letter pair (no "FX:" prefix) like the other REST
+// providers already handle via mapSymbolForProvider below.
 
 // TradingView-format symbol aliases for sources that need EXCHANGE:TICKER
 const TV_ALIASES: Record<string, string> = {
@@ -206,6 +215,11 @@ async function main() {
     new AlphaVantageProvider(),
     new PolygonProvider(),
     new EcbProvider(),
+    new BigparaProvider(),
+    new IsYatirimProvider(),
+    new TcmbEvdsProvider(),
+    new BiQuoteProvider(),
+    new TradingViewScannerProvider(),
     new YahooProvider(),
   ];
 

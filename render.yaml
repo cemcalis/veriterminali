@@ -34,6 +34,14 @@ services:
         sync: false
       - key: BIST_L2_VENDOR
         sync: false
+      - key: EVDS_API_KEY
+        sync: false
+      - key: BIQUOTE_ENABLED
+        value: false
+      - key: BIQUOTE_REST_URL
+        value: https://biquote.io
+      - key: ENABLE_TRADINGVIEW_SCANNER
+        value: true
       - key: ENABLE_STARTUP_STREAMS
         value: true
       - key: ENABLE_TRADINGVIEW
