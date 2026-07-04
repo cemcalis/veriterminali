@@ -1,7 +1,21 @@
 import type { SymbolDef } from './symbols.js';
 import type { MarketCategory } from './providers/market-provider.interface.js';
+import { FmpProvider } from './providers/fmp.provider.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+const fmp = new FmpProvider();
+
+/** FMP's search-symbol endpoint (US stocks/ETFs) -- a no-op returning []
+ * when FMP_API_KEY isn't set, so this is always safe to include. */
+async function lookupFmp(query: string, limit: number): Promise<SymbolDef[]> {
+  const matches = await fmp.searchSymbol(query, limit);
+  return matches.map((m) => ({
+    symbol: m.symbol,
+    category: 'us_stock' as MarketCategory,
+    displayName: m.name,
+    displayNameTr: m.name,
+  }));
+}
 
 /** Checks whether `${query}USDT` is a real, currently-traded Binance pair
  * by hitting the live ticker endpoint -- never fabricates a symbol. */
@@ -89,7 +103,11 @@ export async function dynamicSymbolLookup(query: string, limit = 8): Promise<Sym
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const [binanceMatch, yahooMatches] = await Promise.all([lookupBinance(trimmed), lookupYahoo(trimmed, limit)]);
+  const [binanceMatch, yahooMatches, fmpMatches] = await Promise.all([
+    lookupBinance(trimmed),
+    lookupYahoo(trimmed, limit),
+    lookupFmp(trimmed, limit),
+  ]);
 
   const results: SymbolDef[] = [];
   const seen = new Set<string>();
@@ -97,7 +115,7 @@ export async function dynamicSymbolLookup(query: string, limit = 8): Promise<Sym
     results.push(binanceMatch);
     seen.add(binanceMatch.symbol);
   }
-  for (const m of yahooMatches) {
+  for (const m of [...yahooMatches, ...fmpMatches]) {
     if (seen.has(m.symbol)) continue;
     seen.add(m.symbol);
     results.push(m);

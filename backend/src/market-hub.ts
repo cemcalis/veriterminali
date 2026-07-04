@@ -47,11 +47,17 @@ const FLAGS = {
 
 /** Finnhub's free WS connection is capped (~50 symbols); this is the
  * budget we stay under. Slots are allocated by priority tier, not just
- * "first 45 in the catalog" -- see FinnhubSlotManager. */
+ * "first 45 in the catalog" -- see WsSlotManager. */
 const FINNHUB_WS_CAPACITY = 45;
 
-/** Manages which us_stock/etf symbols occupy Finnhub's limited free-tier
- * WS slots. Two tiers:
+/** TwelveData's Basic 8 plan: 1 WS connection, 8 symbol credits. Reuses
+ * the same WsSlotManager rotation as Finnhub, sized to the plan's cap
+ * (see MAX_WS_SYMBOLS in twelvedata.provider.ts). */
+const TWELVEDATA_WS_CAPACITY = 8;
+
+/** Manages which symbols occupy a provider's limited WS slot budget
+ * (originally written for Finnhub's us_stock/etf cap, now shared with
+ * TwelveData's forex/commodity/index cap). Two tiers:
  *  - "dynamic" symbols: whatever subscribeDynamic() has live interest in
  *    right now (a client's watchlist, the category page they're looking
  *    at, or the chart they currently have open) -- always wins a slot if
@@ -64,7 +70,7 @@ const FINNHUB_WS_CAPACITY = 45;
  * trending/most-liquid" rotation -- "trending" degrades honestly to the
  * static liquidity-ordered catalog rather than inventing a separate
  * trending-detection subsystem. */
-class FinnhubSlotManager {
+class WsSlotManager {
   private dynamicRefCounts = new Map<string, number>();
   private fillSymbols = new Set<string>();
 
@@ -190,7 +196,9 @@ export class MarketHub {
   // duplicate ticks) on every dynamic subscribe.
   private readonly tvTickListener = (quote: Quote) => this.handleTick(quote);
   private readonly finnhubTickListener = (quote: Quote) => this.handleTick(quote);
-  private finnhubSlots: FinnhubSlotManager | null = null;
+  private readonly twelvedataTickListener = (quote: Quote) => this.handleTick(quote);
+  private finnhubSlots: WsSlotManager | null = null;
+  private twelvedataSlots: WsSlotManager | null = null;
   readonly discovered = new DiscoveredSymbolStore(
     new JsonStore(fileURLToPath(new URL('../data/discovered-symbols.json', import.meta.url)), {}),
   );
@@ -317,14 +325,14 @@ export class MarketHub {
     // Finnhub's free tier includes a genuine real-time trade WebSocket
     // (not a scrape, not IP-blocked the way TradingView's unofficial
     // socket is) -- a real, legal, no-cost upgrade for the US-listed
-    // symbols it actually covers. Smart rotation (FinnhubSlotManager)
+    // symbols it actually covers. Smart rotation (WsSlotManager)
     // seeds the connection with the most-liquid static symbols at boot;
     // subscribeDynamic() promotes watchlist/visible/current symbols over
     // that static fill as real users ask for them. Skipped entirely if
     // no key is set.
     if (process.env.FINNHUB_API_KEY) {
       const finnhubPool = SYMBOL_CATALOG.filter((s) => s.category === 'us_stock' || s.category === 'etf').map((s) => s.symbol);
-      this.finnhubSlots = new FinnhubSlotManager(FINNHUB_WS_CAPACITY, finnhubPool);
+      this.finnhubSlots = new WsSlotManager(FINNHUB_WS_CAPACITY, finnhubPool);
       const seeded = this.finnhubSlots.seedFill();
       await this.subscribeStartupPriority('Finnhub', async () => {
         await this.finnhub.subscribe(seeded, this.finnhubTickListener);
@@ -332,6 +340,26 @@ export class MarketHub {
       });
     } else {
       console.log('[market-hub] FINNHUB_API_KEY not set -- skipping free real-time Finnhub WS for us_stock/etf');
+    }
+
+    // TwelveData's Basic 8 plan: exactly 1 WS connection, 8 symbol
+    // credits total. Seeded with the most-liquid forex/commodity/index
+    // priority symbols, same smart-rotation contract as Finnhub above --
+    // subscribeDynamic() promotes watchlist/visible/current symbols over
+    // the static fill. Never spammed with the full ~100+ symbol catalog
+    // for these categories, only ever up to TWELVEDATA_WS_CAPACITY.
+    if (process.env.TWELVEDATA_API_KEY) {
+      const twelvedataPool = SYMBOL_CATALOG.filter(
+        (s) => s.category === 'forex' || s.category === 'commodity' || s.category === 'index',
+      ).map((s) => s.symbol);
+      this.twelvedataSlots = new WsSlotManager(TWELVEDATA_WS_CAPACITY, twelvedataPool);
+      const seeded = this.twelvedataSlots.seedFill();
+      await this.subscribeStartupPriority('TwelveData', async () => {
+        await this.twelvedata.subscribe(seeded, this.twelvedataTickListener);
+        console.log(`[market-hub] subscribed ${seeded.length} forex/commodity/index symbols via TwelveData (Basic 8, 1 WS conn, smart rotation)`);
+      });
+    } else {
+      console.log('[market-hub] TWELVEDATA_API_KEY not set -- skipping TwelveData WS for forex/commodity/index');
     }
   }
 
@@ -346,6 +374,10 @@ export class MarketHub {
       const cat = this.findDef(s)?.category;
       return this.finnhubSlots && (cat === 'us_stock' || cat === 'etf');
     });
+    const twelvedataEligible = symbols.filter((s) => {
+      const cat = this.findDef(s)?.category;
+      return this.twelvedataSlots && (cat === 'forex' || cat === 'commodity' || cat === 'index');
+    });
     const nonStreamed = symbols.filter((s) => {
       const cat = this.findDef(s)?.category;
       // Unknown symbols (no catalog/discovered def) are rejected here
@@ -353,10 +385,13 @@ export class MarketHub {
       // subscribe arbitrary strings that unsubscribeDynamic then skips
       // (it also requires `def`), leaking ref-count entries forever.
       if (cat === undefined || cat === 'crypto' || cat === 'crypto_futures') return false;
-      // us_stock/etf symbols that Finnhub's slot manager can serve don't
-      // also need a TradingView slot -- watchlist/visible/current symbols
-      // get priority over the static TV priority list this way.
-      return !(this.finnhubSlots && (cat === 'us_stock' || cat === 'etf'));
+      // us_stock/etf symbols that Finnhub's slot manager can serve, and
+      // forex/commodity/index symbols TwelveData's slot manager can
+      // serve, don't also need a TradingView slot -- watchlist/visible/
+      // current symbols get priority over the static TV priority list.
+      if (this.finnhubSlots && (cat === 'us_stock' || cat === 'etf')) return false;
+      if (this.twelvedataSlots && (cat === 'forex' || cat === 'commodity' || cat === 'index')) return false;
+      return true;
     });
 
     // Catalog crypto/futures are already subscribed at startup;
@@ -384,6 +419,16 @@ export class MarketHub {
       }
     }
 
+    if (twelvedataEligible.length > 0 && this.twelvedataSlots) {
+      const { toAdd, toEvict } = this.twelvedataSlots.requestSlots(twelvedataEligible);
+      if (toEvict.length > 0) void this.twelvedata.unsubscribe(toEvict);
+      if (toAdd.length > 0) {
+        this.twelvedata.subscribe(toAdd, this.twelvedataTickListener).catch((err) => {
+          console.error('[market-hub] dynamic TwelveData subscribe failed:', err instanceof Error ? err.message : err);
+        });
+      }
+    }
+
     if (nonStreamed.length > 0 && FLAGS.tradingView && FLAGS.tradingViewStreams) {
       const toSubscribe: string[] = [];
       for (const symbol of nonStreamed) {
@@ -407,12 +452,15 @@ export class MarketHub {
    * are never actually dropped from the live socket even at ref count 0. */
   unsubscribeDynamic(symbols: string[]): void {
     const finnhubEligible: string[] = [];
+    const twelvedataEligible: string[] = [];
     const tvEligible: string[] = [];
     for (const symbol of symbols) {
       const def = this.findDef(symbol);
       if (!def || def.category === 'crypto' || def.category === 'crypto_futures') continue;
       if (this.finnhubSlots && (def.category === 'us_stock' || def.category === 'etf')) {
         finnhubEligible.push(symbol);
+      } else if (this.twelvedataSlots && (def.category === 'forex' || def.category === 'commodity' || def.category === 'index')) {
+        twelvedataEligible.push(symbol);
       } else {
         tvEligible.push(symbol);
       }
@@ -424,6 +472,16 @@ export class MarketHub {
       if (toBackfill.length > 0) {
         this.finnhub.subscribe(toBackfill, this.finnhubTickListener).catch((err) => {
           console.error('[market-hub] Finnhub backfill subscribe failed:', err instanceof Error ? err.message : err);
+        });
+      }
+    }
+
+    if (twelvedataEligible.length > 0 && this.twelvedataSlots) {
+      const { toRemove, toBackfill } = this.twelvedataSlots.releaseSlots(twelvedataEligible);
+      if (toRemove.length > 0) void this.twelvedata.unsubscribe(toRemove);
+      if (toBackfill.length > 0) {
+        this.twelvedata.subscribe(toBackfill, this.twelvedataTickListener).catch((err) => {
+          console.error('[market-hub] TwelveData backfill subscribe failed:', err instanceof Error ? err.message : err);
         });
       }
     }
@@ -521,17 +579,32 @@ export class MarketHub {
 
   /** Per-category provider priority, in the exact order requested:
    * crypto/futures are Binance-only (real WS + REST); every other
-   * category tries free/legal REST sources in order before ever touching
-   * TradingView's unofficial socket, and TradingView itself is skipped
-   * outright when ENABLE_TRADINGVIEW=false. Each step is wrapped by
-   * providerHealth so a provider that's tripped its circuit breaker
-   * (e.g. TradingView mid-451-block) is skipped instantly, no wasted
-   * network round-trip. */
+   * category tries the lowest-latency source it actually has first:
+   * (1) true WebSocket real-time, (2) near-live public endpoint,
+   * (3) fast REST quote, (4) delayed REST, (5) daily/reference fallback.
+   * TradingView's unofficial socket is real-time (tier 1) when reachable,
+   * but is demoted below tier-2/3 sources in every non-BIST/non-crypto
+   * category because it has a *confirmed* Render reliability problem
+   * (HTTP 451, Cloudflare blocking the shared outbound IP range) --
+   * ranking it above official/legal sources that don't share that risk
+   * would violate the "never put delayed providers before live providers"
+   * rule the moment TV silently drops back to REST fallback anyway. It's
+   * skipped outright when ENABLE_TRADINGVIEW=false. Each step is wrapped
+   * by providerHealth so a provider that's tripped its circuit breaker is
+   * skipped instantly, no wasted network round-trip.
+   *
+   * NOT implemented (would require net-new integrations beyond this
+   * pass's scope, tracked separately rather than faked): OKX/Bybit/
+   * KuCoin/Coinbase/CoinGecko/CoinCap/MEXC crypto fallbacks, iTick,
+   * Stooq. Crypto already has a true real-time WS primary (Binance) so
+   * their absence doesn't currently create a gap; forex/commodity/index
+   * would benefit from iTick WS and Stooq REST if added later. */
   private fallbackChainFor(def: SymbolDef): { providerId: string; fetch: () => Promise<Quote | null> }[] {
     const sym = def.symbol;
     const finnhub = { providerId: 'finnhub', fetch: () => this.finnhub.getQuote(sym) };
     const twelvedata = { providerId: 'twelvedata', fetch: () => this.twelvedata.getQuote(sym) };
     const fmp = { providerId: 'fmp', fetch: () => this.fmp.getQuote(sym) };
+    const polygon = { providerId: 'polygon', fetch: () => this.polygon.getQuote(sym) };
     const alphavantage = { providerId: 'alphavantage', fetch: () => this.alphavantage.getQuote(sym) };
     const ecb = { providerId: 'ecb', fetch: () => this.ecb.getQuote(sym) };
     const tcmbEvds = { providerId: 'tcmb-evds', fetch: () => this.tcmbEvds.getQuote(sym) };
@@ -543,29 +616,47 @@ export class MarketHub {
 
     switch (def.category) {
       case 'crypto':
+        // Tier 1 only: Binance's public WS is genuinely real-time, free,
+        // and stable -- no REST fallback layer currently beats it, so
+        // none is chained (see NOT-implemented note above).
         return [{ providerId: 'binance', fetch: () => this.binance.getQuote(sym) }];
       case 'crypto_futures':
         return [{ providerId: 'binance-futures', fetch: () => this.binanceFutures.getQuote(sym) }];
       case 'us_stock':
       case 'etf':
-        return [finnhub, twelvedata, fmp, ...yahoo, ...tradingview, alphavantage];
+        // Finnhub (tier 1, real WS) -> Massive/Polygon if a working key
+        // exists (tier 1/3, currently a no-op: no free tier as of 2026,
+        // see polygon.provider.ts) -> FMP (tier 4) -> TwelveData (tier 4)
+        // -> Yahoo (tier 4, delayed) -> TradingView (tier 1 but Render-
+        // risky, demoted) -> Alpha Vantage (tier 4, 25/day last resort).
+        return [finnhub, polygon, fmp, twelvedata, ...yahoo, ...tradingview, alphavantage];
       case 'forex':
-        // biquote/tcmb-evds are both gated (BIQUOTE_ENABLED=false default,
-        // tcmb-evds requires EVDS_API_KEY) so they're harmless no-ops in
-        // the chain until explicitly enabled/configured.
-        return [finnhub, twelvedata, fmp, ...tradingview, ecb, tcmbEvds, biquote, ...yahoo, alphavantage];
+        // Finnhub (tier 1) -> TwelveData (tier 1 WS for priority symbols
+        // via subscribeDynamic, tier 3 REST here) -> FMP (tier 4) ->
+        // BiQuote if explicitly enabled (tier 2, gated) -> TradingView
+        // (tier 1 but Render-risky, demoted) -> ECB/TCMB (tier 5, daily
+        // reference only) -> Yahoo (tier 4) -> Alpha Vantage (last resort).
+        return [finnhub, twelvedata, fmp, biquote, ...tradingview, ecb, tcmbEvds, ...yahoo, alphavantage];
       case 'commodity':
-        return [twelvedata, finnhub, fmp, ...tradingview, ...yahoo, alphavantage];
+        // TwelveData (tier 1 WS/tier 3 REST) -> Finnhub (tier 4, not
+        // officially covered but harmless if it returns nothing) -> FMP
+        // (tier 4) -> BiQuote if enabled (tier 2) -> TradingView (tier 1
+        // but demoted) -> Yahoo (tier 4) -> Alpha Vantage (last resort).
+        return [twelvedata, finnhub, fmp, biquote, ...tradingview, ...yahoo, alphavantage];
       case 'index':
-        return [finnhub, twelvedata, fmp, ...tradingview, ...yahoo];
+        // TwelveData (tier 1/3) -> Finnhub -> FMP (tier 4) -> Yahoo
+        // (tier 4) -> TradingView (tier 1 but demoted to last since this
+        // category wasn't given an explicit TV fallback slot).
+        return [twelvedata, finnhub, fmp, ...yahoo, ...tradingview];
       case 'bist':
         // BIST realtime depth/AKD/takas has no free path at all (see
-        // bist-institutional.provider.ts). For last-price quotes,
-        // bigpara (near-live public frontend snapshot) and isyatirim
-        // (daily public frontend OHLC) are tried right after TradingView
-        // -- both are undocumented-but-unauthenticated endpoints that
-        // work even when TradingView's socket is Render-blocked (451).
-        return [...tradingview, bigpara, isyatirim, ...yahoo, twelvedata, fmp];
+        // bist-institutional.provider.ts). For last-price quotes:
+        // bigpara (tier 2, near-live public frontend snapshot) ->
+        // isyatirim (tier 4, daily public frontend OHLC) -> Yahoo (tier
+        // 4, delayed) -> TradingView (tier 1 but Render-risky, "only if
+        // it works") -> TwelveData/FMP (tier 4, no real BIST coverage,
+        // harmless last-resort no-ops).
+        return [bigpara, isyatirim, ...yahoo, ...tradingview, twelvedata, fmp];
       default:
         return [];
     }
@@ -610,6 +701,9 @@ export class MarketHub {
       finnhub: this.finnhubSlots
         ? { configured: true, capacity: FINNHUB_WS_CAPACITY }
         : { configured: false, capacity: FINNHUB_WS_CAPACITY },
+      twelvedata: this.twelvedataSlots
+        ? { configured: true, capacity: TWELVEDATA_WS_CAPACITY }
+        : { configured: false, capacity: TWELVEDATA_WS_CAPACITY },
     };
   }
 
