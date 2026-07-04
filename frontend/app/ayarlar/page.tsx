@@ -18,6 +18,13 @@ const CIRCUIT_LABEL: Record<'closed' | 'open' | 'half-open', string> = {
   'half-open': 'test ediliyor',
 };
 
+// Build-time kill switch: even though debugMode already defaults to off
+// and is a local per-user toggle, this env flag lets a production deploy
+// remove the developer panel entirely (no toggle, no provider names ever
+// rendered) regardless of any client-side state. Defaults to false --
+// must be explicitly set to "true" to show the toggle at all.
+const DEBUG_PANEL_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEBUG_PANEL === 'true';
+
 export default function AyarlarPage() {
   const [providers, setProviders] = useState<ProviderWithCircuit[]>([]);
   const [cacheBackend, setCacheBackend] = useState<string>('—');
@@ -98,28 +105,30 @@ export default function AyarlarPage() {
         <ChevronRight size={15} className="text-slate-600" />
       </Link>
 
-      <div className="mx-4 mt-3 panel-elevated p-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bug size={16} className="text-slate-400" />
-          <div>
-            <div className="text-sm">Geliştirici Modu</div>
-            <div className="text-[11px] text-slate-500">Sağlayıcı ve teknik detayları göster</div>
+      {DEBUG_PANEL_ENABLED && (
+        <div className="mx-4 mt-3 panel-elevated p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bug size={16} className="text-slate-400" />
+            <div>
+              <div className="text-sm">Geliştirici Modu</div>
+              <div className="text-[11px] text-slate-500">Sağlayıcı ve teknik detayları göster</div>
+            </div>
           </div>
+          <button
+            onClick={() => {
+              haptic('select');
+              toggleDebugMode();
+            }}
+            className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${debugMode ? 'bg-emerald-500' : 'bg-slate-700'}`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${debugMode ? 'translate-x-5' : 'translate-x-0.5'}`}
+            />
+          </button>
         </div>
-        <button
-          onClick={() => {
-            haptic('select');
-            toggleDebugMode();
-          }}
-          className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${debugMode ? 'bg-emerald-500' : 'bg-slate-700'}`}
-        >
-          <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${debugMode ? 'translate-x-5' : 'translate-x-0.5'}`}
-          />
-        </button>
-      </div>
+      )}
 
-      {debugMode && (
+      {DEBUG_PANEL_ENABLED && debugMode && (
         <>
           <div className="mx-4 mt-3 panel-elevated p-3 flex flex-col gap-2">
             <div className="flex items-center gap-2">

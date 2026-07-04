@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { MarketHub } from '../market-hub.js';
+import { FmpProvider } from '../../../src/providers/fmp.provider.js';
 import type { MarketCategory, CandleInterval } from '../../../src/providers/market-provider.interface.js';
 
 const VALID_INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const fmp = new FmpProvider();
 
 export function marketRouter(hub: MarketHub) {
   const router = Router();
@@ -62,6 +64,16 @@ export function marketRouter(hub: MarketHub) {
     } catch (err) {
       res.status(502).json({ error: err instanceof Error ? err.message : 'candle fetch failed' });
     }
+  });
+
+  /** FMP company profile -- US stocks/ETFs only; returns 404 when
+   * FMP_API_KEY isn't set or the symbol has no profile (e.g. BIST/forex/
+   * crypto, which FMP doesn't cover). */
+  router.get('/company/:symbol', async (req, res) => {
+    const symbol = decodeURIComponent(req.params.symbol);
+    const profile = await fmp.getCompanyProfile(symbol);
+    if (!profile) return res.status(404).json({ error: 'no company profile available for this symbol' });
+    res.json({ profile });
   });
 
   router.get('/health', async (_req, res) => {

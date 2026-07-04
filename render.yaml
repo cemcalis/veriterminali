@@ -69,3 +69,5 @@ services:
         sync: false
       - key: NEXT_PUBLIC_BACKEND_WS_URL
         sync: false
+      - key: NEXT_PUBLIC_ENABLE_DEBUG_PANEL
+        value: false
