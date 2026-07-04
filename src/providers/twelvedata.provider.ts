@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout.js';
 import type {
   Candle,
   CandleInterval,
@@ -49,7 +50,7 @@ export class TwelveDataProvider implements MarketProvider {
   async getQuote(symbol: string): Promise<Quote | null> {
     if (!this.apiKey) return null;
     const sym = toTwelveDataSymbol(symbol);
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${REST_BASE}/quote?symbol=${encodeURIComponent(sym)}&apikey=${this.apiKey}`,
     );
     if (!res.ok) return null;
@@ -77,7 +78,7 @@ export class TwelveDataProvider implements MarketProvider {
   async getCandles(symbol: string, interval: CandleInterval, limit = 200): Promise<Candle[]> {
     if (!this.apiKey) return [];
     const sym = toTwelveDataSymbol(symbol);
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${REST_BASE}/time_series?symbol=${encodeURIComponent(sym)}&interval=${INTERVAL_MAP[interval]}&outputsize=${limit}&apikey=${this.apiKey}`,
     );
     if (!res.ok) return [];
@@ -113,7 +114,7 @@ export class TwelveDataProvider implements MarketProvider {
     }
     const start = Date.now();
     try {
-      const res = await fetch(`${REST_BASE}/quote?symbol=AAPL&apikey=${this.apiKey}`);
+      const res = await fetchWithTimeout(`${REST_BASE}/quote?symbol=AAPL&apikey=${this.apiKey}`);
       const latencyMs = Date.now() - start;
       return {
         provider: this.id,

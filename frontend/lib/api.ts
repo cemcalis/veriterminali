@@ -35,6 +35,14 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   status: () => json<{ ok: boolean; cacheBackend: string; time: number }>('/api/status'),
   health: () => json<{ providers: ProviderHealth[] }>('/api/market/health'),
+  providerDiagnostics: () =>
+    json<{
+      providers: (ProviderHealth & {
+        circuit: { state: 'closed' | 'open' | 'half-open'; consecutiveFailures: number; lastError: string | null } | null;
+      })[];
+      flags: Record<string, boolean>;
+      finnhub: { configured: boolean; capacity: number };
+    }>('/api/provider-diagnostics'),
   quote: (symbol: string) => json<{ quote: Quote }>(`/api/market/quote/${encodeURIComponent(symbol)}`),
   search: (query: string) =>
     json<{ results: SymbolDef[]; discovered: boolean }>(`/api/market/search?q=${encodeURIComponent(query)}`),

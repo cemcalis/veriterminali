@@ -4,6 +4,7 @@
  * that Yahoo can rate-limit or change without notice -- use only as a
  * delayed/near-real-time fallback when better sources are unavailable.
  */
+import { fetchWithTimeout } from './fetch-with-timeout.js';
 import type {
   Candle,
   CandleInterval,
@@ -64,7 +65,7 @@ export class YahooProvider implements MarketProvider {
 
   async getQuote(symbol: string): Promise<Quote | null> {
     const ySymbol = toYahooSymbol(symbol);
-    const res = await fetch(`${CHART_BASE}/${encodeURIComponent(ySymbol)}?interval=1d&range=1d`, {
+    const res = await fetchWithTimeout(`${CHART_BASE}/${encodeURIComponent(ySymbol)}?interval=1d&range=1d`, {
       headers: { 'User-Agent': UA },
     });
     if (!res.ok) return null;
@@ -92,7 +93,7 @@ export class YahooProvider implements MarketProvider {
   async getCandles(symbol: string, interval: CandleInterval): Promise<Candle[]> {
     const ySymbol = toYahooSymbol(symbol);
     const { interval: yInterval, range } = INTERVAL_MAP[interval];
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${CHART_BASE}/${encodeURIComponent(ySymbol)}?interval=${yInterval}&range=${range}`,
       { headers: { 'User-Agent': UA } },
     );
@@ -120,7 +121,7 @@ export class YahooProvider implements MarketProvider {
   async healthCheck(): Promise<ProviderHealth> {
     const start = Date.now();
     try {
-      const res = await fetch(`${CHART_BASE}/AAPL?interval=1d&range=1d`, {
+      const res = await fetchWithTimeout(`${CHART_BASE}/AAPL?interval=1d&range=1d`, {
         headers: { 'User-Agent': UA },
       });
       const latencyMs = Date.now() - start;

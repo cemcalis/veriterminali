@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { fetchWithTimeout } from './fetch-with-timeout.js';
 import type {
   Candle,
   CandleInterval,
@@ -139,7 +140,7 @@ export class FinnhubProvider implements MarketProvider {
   async getQuote(symbol: string): Promise<Quote | null> {
     if (!this.apiKey) return null;
     const sym = toFinnhubSymbol(symbol);
-    const res = await fetch(`${REST_BASE}/quote?symbol=${encodeURIComponent(sym)}&token=${this.apiKey}`);
+    const res = await fetchWithTimeout(`${REST_BASE}/quote?symbol=${encodeURIComponent(sym)}&token=${this.apiKey}`);
     if (!res.ok) return null;
     const j = (await res.json()) as { c: number; d: number; dp: number; t: number };
     if (!j.c) return null;
@@ -162,7 +163,7 @@ export class FinnhubProvider implements MarketProvider {
     const to = Math.floor(Date.now() / 1000);
     const spanSeconds = 60 * (interval === '1d' ? 86400 : Number(resolution) * 60) * limit;
     const from = to - spanSeconds;
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${REST_BASE}/stock/candle?symbol=${encodeURIComponent(sym)}&resolution=${resolution}&from=${from}&to=${to}&token=${this.apiKey}`,
     );
     if (!res.ok) return [];
@@ -193,7 +194,7 @@ export class FinnhubProvider implements MarketProvider {
     }
     const start = Date.now();
     try {
-      const res = await fetch(`${REST_BASE}/quote?symbol=AAPL&token=${this.apiKey}`);
+      const res = await fetchWithTimeout(`${REST_BASE}/quote?symbol=AAPL&token=${this.apiKey}`);
       const latencyMs = Date.now() - start;
       return {
         provider: this.id,

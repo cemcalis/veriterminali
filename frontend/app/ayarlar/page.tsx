@@ -8,8 +8,18 @@ import { useMarketStore } from '@/lib/store';
 import { haptic } from '@/lib/telegram';
 import type { ProviderHealth } from '@/lib/types';
 
+type ProviderWithCircuit = ProviderHealth & {
+  circuit: { state: 'closed' | 'open' | 'half-open'; consecutiveFailures: number; lastError: string | null } | null;
+};
+
+const CIRCUIT_LABEL: Record<'closed' | 'open' | 'half-open', string> = {
+  closed: 'çalışıyor',
+  open: 'devre açık (engelli)',
+  'half-open': 'test ediliyor',
+};
+
 export default function AyarlarPage() {
-  const [providers, setProviders] = useState<ProviderHealth[]>([]);
+  const [providers, setProviders] = useState<ProviderWithCircuit[]>([]);
   const [cacheBackend, setCacheBackend] = useState<string>('—');
   const [loading, setLoading] = useState(true);
   const debugMode = useMarketStore((s) => s.debugMode);
@@ -19,8 +29,8 @@ export default function AyarlarPage() {
 
   async function refresh() {
     try {
-      const [health, status] = await Promise.all([api.health(), api.status()]);
-      setProviders(health.providers);
+      const [diagnostics, status] = await Promise.all([api.providerDiagnostics(), api.status()]);
+      setProviders(diagnostics.providers);
       setCacheBackend(status.cacheBackend);
     } finally {
       setLoading(false);
@@ -152,6 +162,12 @@ export default function AyarlarPage() {
                         </span>
                       )}
                     </div>
+                    {p.circuit && p.circuit.state !== 'closed' && (
+                      <div className="mt-1.5 pt-1.5 border-t border-[var(--border)] text-[10px] text-red-400">
+                        Devre kesici: {CIRCUIT_LABEL[p.circuit.state]} ({p.circuit.consecutiveFailures} ardışık hata)
+                        {p.circuit.lastError && <span className="text-slate-600"> — {p.circuit.lastError}</span>}
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>

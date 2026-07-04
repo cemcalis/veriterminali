@@ -92,10 +92,32 @@ Deploy sonrası doğrulama:
 ```bash
 curl https://<backend-domain>/api/status
 curl https://<backend-domain>/api/market/health
+curl https://<backend-domain>/api/provider-diagnostics
 curl https://<backend-domain>/api/market/quote/BINANCE:BTCUSDT
 ```
 
-Frontend'de **Ayarlar** sayfası aynı health endpoint'ini kullanıcıya gösterir.
+`/api/status` her zaman 200 döner (sağlayıcı durumundan bağımsız). `/api/provider-diagnostics`
+her sağlayıcının devre kesici durumunu (`closed`/`open`/`half-open`), ardışık hata sayısını ve
+son hatayı gösterir — bir sağlayıcı 3 kez üst üste başarısız olursa devresi 30sn'liğine açılır,
+o sürede o sağlayıcıya hiç ağ isteği yapılmaz (bkz. `src/providers/provider-health.ts`).
+Frontend'de **Ayarlar → Geliştirici Modu** aynı bilgiyi kullanıcıya gösterir; normal kullanıcılar
+bu teknik detayları hiç görmez.
+
+### Sağlayıcı önceliği / kategori bazlı fallback zinciri
+
+| Kategori | Zincir (soldan sağa denenir) |
+|---|---|
+| Kripto | Binance WS/REST (tek kaynak, gerçek zamanlı) |
+| Kripto Vadeli | Binance Futures WS/REST (tek kaynak, gerçek zamanlı) |
+| ABD Hisse/ETF | Finnhub → TwelveData → FMP → Yahoo (gecikmeli) → TradingView (deneysel, en son) → Alpha Vantage (son çare) |
+| Forex | Finnhub → TwelveData → FMP → TradingView (deneysel) → ECB (günlük referans) → Yahoo (gecikmeli) → Alpha Vantage |
+| Emtia | TwelveData → Finnhub → FMP → TradingView (deneysel) → Yahoo (gecikmeli) → Alpha Vantage |
+| Endeks | Finnhub → TwelveData → FMP → TradingView (deneysel) → Yahoo (gecikmeli) |
+| BIST | TradingView (deneysel) → Yahoo (gecikmeli) → TwelveData → FMP |
+
+`ENABLE_TRADINGVIEW=false` TradingView'i tamamen devre dışı bırakır (örn. kalıcı olarak
+engellendiği kesinleşince). `ENABLE_STARTUP_STREAMS=false` hiçbir WebSocket bağlantısı
+denemeden saf REST-fallback modunda çalışır.
 
 ## Ölçeklendirme notları
 
